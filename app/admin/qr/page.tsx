@@ -13,9 +13,21 @@ const forms = [
 
 export default function AdminQrPage() {
   const [qrs, setQrs] = useState<Record<string, string>>({});
-  const base = process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin;
+  const [base, setBase] = useState(
+    process.env.NEXT_PUBLIC_SITE_URL || "",
+  );
 
   useEffect(() => {
+    const fromEnv = process.env.NEXT_PUBLIC_SITE_URL;
+    const configured =
+      fromEnv && !fromEnv.includes("your-app.vercel.app")
+        ? fromEnv.replace(/\/$/, "")
+        : window.location.origin;
+    setBase(configured);
+  }, []);
+
+  useEffect(() => {
+    if (!base) return;
     forms.forEach(async (f) => {
       const url = `${base}${f.path}`;
       const data = await QRCode.toDataURL(url, { width: 280, margin: 2 });

@@ -1,4 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/server";
+
+export const dynamic = "force-dynamic";
 import { SiteShell } from "@/components/site-shell";
 import { maskEmiratesId, isEidExpired } from "@/lib/mask-eid";
 
