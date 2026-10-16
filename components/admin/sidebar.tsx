@@ -1,5 +1,7 @@
 import Link from "next/link";
+import Image from "next/image";
 import { LayoutDashboard, FileText, QrCode, Settings } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const links = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
@@ -10,17 +12,23 @@ const links = [
 
 export function AdminSidebar() {
   return (
-    <aside className="hidden w-56 shrink-0 border-r bg-white md:block">
-      <div className="border-b p-4">
-        <p className="font-bold text-sma-navy">SMA Admin</p>
-        <p className="text-xs text-muted-foreground">EHS Officer</p>
+    <aside className="hidden w-56 shrink-0 border-r border-border bg-card md:block">
+      <div className="flex items-center gap-3 border-b p-4">
+        <Image src="/sma-logo.jpg" alt="SMA" width={40} height={40} className="h-10 w-10 rounded-full object-cover ring-2 ring-sma-gold" />
+        <div>
+          <p className="font-bold text-foreground">SMA Admin</p>
+          <p className="text-xs text-muted-foreground">EHS Officer</p>
+        </div>
+      </div>
+      <div className="px-3 pt-3">
+        <ThemeToggle tone="onLight" />
       </div>
       <nav className="space-y-1 p-3">
         {links.map((l) => (
           <Link
             key={l.href}
             href={l.href}
-            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-sma-navy hover:bg-sma-section"
+            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-foreground hover:bg-muted"
           >
             <l.icon className="h-4 w-4 text-sma-gold" />
             {l.label}
