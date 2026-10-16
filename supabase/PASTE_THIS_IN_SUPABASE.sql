@@ -160,4 +160,9 @@ insert into storage.buckets (id, name, public)
 values ('submissions', 'submissions', false)
 on conflict (id) do nothing;
 
+alter table submissions
+  add column if not exists owner_id uuid references auth.users (id) on delete set null;
+
+create index if not exists submissions_owner_idx on submissions (owner_id);
+
 -- Done. You should see "Success" in Supabase.

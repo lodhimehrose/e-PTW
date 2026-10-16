@@ -40,11 +40,11 @@ export default function HomePage() {
               Choose a form, sign, and submit. You will receive a reference number. The EHS officer reviews every request.
             </p>
             <div className="mt-6 flex flex-wrap gap-3 text-sm">
-              <Link href="/status" className="rounded-full border border-border px-4 py-2 font-medium text-foreground hover:bg-muted">
-                Track a submission
+              <Link href="/portal/signup" className="rounded-full border border-border px-4 py-2 font-medium text-foreground hover:bg-muted">
+                Create an account
               </Link>
-              <Link href="/admin/login" className="rounded-full px-4 py-2 font-medium text-foreground/80 hover:bg-muted">
-                EHS officer login
+              <Link href="/portal" className="rounded-full px-4 py-2 font-medium text-foreground/80 hover:bg-muted">
+                My portal
               </Link>
             </div>
           </div>

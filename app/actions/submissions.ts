@@ -1,6 +1,6 @@
 "use server";
 
-import { createServiceClient } from "@/lib/supabase/server";
+import { createServiceClient, createAuthServerClient } from "@/lib/supabase/server";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { revalidatePath } from "next/cache";
 import { uploadBuffer, uploadDataUrl } from "@/lib/storage";
@@ -49,6 +49,16 @@ export async function submitForm(payload: SubmitPayload) {
   }
 
   const supabase = createServiceClient();
+  let ownerId: string | null = null;
+  try {
+    const auth = await createAuthServerClient();
+    const {
+      data: { user },
+    } = await auth.auth.getUser();
+    if (user) ownerId = user.id;
+  } catch {
+    ownerId = null;
+  }
 
   const { data: refNo, error: refErr } = await supabase.rpc("next_ref_no", {
     p_type: payload.type,
@@ -72,6 +82,7 @@ export async function submitForm(payload: SubmitPayload) {
       end_at: payload.endAt ?? null,
       max_workers: payload.maxWorkers ?? null,
       linked_ref_no: payload.linkedRefNo ?? null,
+      owner_id: ownerId,
       data: payload.data,
       verify_token: randomUUID(),
     })

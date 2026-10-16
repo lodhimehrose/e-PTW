@@ -33,11 +33,14 @@ export async function middleware(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
   const isAdminRoute = path.startsWith("/admin");
-  const isLogin = path === "/admin/login";
+  const isAdminLogin = path === "/admin/login";
+  const isPortalRoute = path.startsWith("/portal");
+  const isPortalAuth = path === "/portal/login" || path === "/portal/signup";
+  const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase();
+  const email = user?.email?.toLowerCase();
 
-  if (isAdminRoute && !isLogin) {
-    const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase();
-    if (!user || user.email?.toLowerCase() !== adminEmail) {
+  if (isAdminRoute && !isAdminLogin) {
+    if (!user || email !== adminEmail) {
       const url = request.nextUrl.clone();
       url.pathname = "/admin/login";
       url.searchParams.set("next", path);
@@ -45,9 +48,21 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  if (isLogin && user?.email?.toLowerCase() === process.env.ADMIN_EMAIL?.toLowerCase()) {
+  if (isAdminLogin && email && email === adminEmail) {
     const url = request.nextUrl.clone();
     url.pathname = "/admin";
+    return NextResponse.redirect(url);
+  }
+
+  if (isPortalRoute && !isPortalAuth && !user) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/portal/login";
+    return NextResponse.redirect(url);
+  }
+
+  if (isPortalAuth && user && email !== adminEmail) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/portal";
     return NextResponse.redirect(url);
   }
 
@@ -55,5 +70,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: ["/admin/:path*", "/portal/:path*"],
 };

@@ -31,8 +31,8 @@ export function SiteShell({
           </Link>
           <nav className="flex shrink-0 items-center gap-2 text-sm">
             <ThemeToggle />
-            <Link href="/status" className="hidden rounded-full px-3 py-1.5 text-white/80 hover:bg-white/10 sm:inline">
-              Track status
+            <Link href="/portal" className="hidden rounded-full px-3 py-1.5 text-white/80 hover:bg-white/10 sm:inline">
+              My portal
             </Link>
             <Link href="/admin/login" className="rounded-full bg-sma-gold px-3 py-1.5 font-medium text-sma-navy">
               EHS login
