@@ -11,6 +11,9 @@ export const workerSchema = z.object({
   eidExpiry: z.string().min(1, "EID expiry is required"),
   mobile: z.string().regex(MOBILE_REGEX, "Use 05XXXXXXXX or +9715XXXXXXXX"),
   inductionDone: z.enum(["yes", "no"]).optional(),
+  eidCopy: z
+    .object({ name: z.string(), type: z.string(), base64: z.string() })
+    .optional(),
 });
 
 export type WorkerInput = z.infer<typeof workerSchema>;
@@ -18,6 +21,29 @@ export type WorkerInput = z.infer<typeof workerSchema>;
 export function validateWorkersEidUnique(workers: WorkerInput[]) {
   const ids = workers.map((w) => w.emiratesId);
   return new Set(ids).size === ids.length;
+}
+
+export function formatEmiratesId(raw: string) {
+  const digits = raw.replace(/\D/g, "").slice(0, 15);
+  if (!digits.startsWith("784")) return raw.replace(/[^\d-]/g, "").slice(0, 18);
+  const year = digits.slice(3, 7);
+  const serial = digits.slice(7, 14);
+  const check = digits.slice(14, 15);
+  return ["784", year, serial, check].filter(Boolean).join("-");
+}
+
+export function workerFieldError(worker: WorkerInput) {
+  const parsed = workerSchema.safeParse({
+    ...worker,
+    emiratesId: formatEmiratesId(worker.emiratesId || ""),
+  });
+  if (!parsed.success) {
+    return parsed.error.issues[0]?.message ?? "Complete this worker";
+  }
+  if (worker.eidExpiry && worker.eidExpiry < new Date().toISOString().slice(0, 10)) {
+    return "This person's Emirates ID is expired";
+  }
+  return "";
 }
 
 export function validateEidAfterWorkEnd(

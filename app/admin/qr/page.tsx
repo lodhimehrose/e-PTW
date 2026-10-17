@@ -6,9 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const forms = [
-  { name: "Contractor Gate Pass", path: "/gate-pass" },
   { name: "Standard Permit to Work", path: "/ptw/standard" },
-  { name: "Emergency PTW", path: "/ptw/emergency" },
+  { name: "Emergency breakdown PTW", path: "/ptw/emergency" },
 ];
 
 export default function AdminQrPage() {
@@ -38,7 +37,7 @@ export default function AdminQrPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-sma-navy">QR codes &amp; links</h1>
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2">
         {forms.map((f) => {
           const url = `${base}${f.path}`;
           return (

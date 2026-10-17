@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { FormWizard } from "@/components/form-wizard";
@@ -14,6 +14,11 @@ import { FileUploadField } from "@/components/file-upload-field";
 import { useFormDraft } from "@/hooks/use-form-draft";
 import { submitForm } from "@/app/actions/submissions";
 import type { FilePayload } from "@/app/actions/submissions";
+import { loadRoster, type SavedWorker } from "@/app/actions/roster";
+import { CompanyPicker } from "@/components/company-picker";
+import type { CompanyMatch } from "@/app/actions/roster";
+import { WorkersEditor } from "@/components/workers-editor";
+import { workerFieldError, validateEidAfterWorkEnd, validateWorkersEidUnique, type WorkerInput } from "@/lib/validations/worker";
 import { HSE_SECTIONS } from "@/lib/hse-requirements";
 import { addWorkingDays, dubaiToday } from "@/lib/working-days";
 import { format } from "date-fns";
@@ -35,6 +40,12 @@ type Draft = {
   declarantName: string;
   signatureDataUrl?: string;
   documents: FilePayload[];
+  workers: WorkerInput[];
+  tradeLicenseNo: string;
+  designation: string;
+  applicantPhone: string;
+  supervisorName: string;
+  supervisorPhone: string;
   honeypot: string;
 };
 
@@ -54,6 +65,12 @@ const initial: Draft = {
   undertakings: [false, false, false, false],
   declarantName: "",
   documents: [],
+  workers: [{ fullName: "", trade: "", emiratesId: "", eidExpiry: "", mobile: "", inductionDone: "no" }],
+  tradeLicenseNo: "",
+  designation: "",
+  applicantPhone: "",
+  supervisorName: "",
+  supervisorPhone: "",
   honeypot: "",
 };
 
@@ -63,6 +80,27 @@ export function PtwStandardForm() {
   const [step, setStep] = useState(1);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [savedWorkers, setSavedWorkers] = useState<SavedWorker[]>([]);
+  const rosterOnce = useRef(false);
+
+  useEffect(() => {
+    if (!hydrated || rosterOnce.current) return;
+    rosterOnce.current = true;
+    loadRoster().then((roster) => {
+      setSavedWorkers(roster.workers);
+      if (!roster.company) return;
+      setData((current) => ({
+        ...current,
+        companyName: current.companyName || roster.company?.companyName || "",
+        applicantEmail: current.applicantEmail || roster.company?.contactEmail || "",
+        applicantName: current.applicantName || roster.company?.applicantName || "",
+        tradeLicenseNo: current.tradeLicenseNo || roster.company?.tradeLicenseNo || "",
+        department: current.department || roster.company?.department || "",
+        supervisorName: current.supervisorName || roster.company?.supervisorName || "",
+        building: current.building || roster.company?.building || current.building,
+      }));
+    });
+  }, [hydrated, setData]);
 
   function validate(s: number) {
     const e: Record<string, string> = {};
@@ -75,6 +113,17 @@ export function PtwStandardForm() {
     }
     if (s === 4 && data.ppe.length === 0) e.ppe = "Select PPE";
     if (s === 4 && data.documents.length === 0) e.documents = "Attach the method statement, trade license, or IDs";
+    if (s === 4) {
+      if (!data.workers.length) e.workers = "Add at least one worker";
+      data.workers.forEach((worker, index) => {
+        const message = workerFieldError(worker);
+        if (message) e[`workers.${index}`] = message;
+      });
+      if (!validateWorkersEidUnique(data.workers)) e.workers = "Duplicate Emirates ID";
+      if (data.endDate && !validateEidAfterWorkEnd(data.workers, data.endDate)) {
+        e.workers = "A worker's Emirates ID expires before the job ends";
+      }
+    }
     if (s === 5) {
       if (!data.hseAck.A) e.hse = "Acknowledge HSE";
       if (!data.undertakings.every(Boolean)) e.undertakings = "All undertakings";
@@ -95,10 +144,35 @@ export function PtwStandardForm() {
       building: data.building,
       startAt: data.startDate,
       endAt: data.endDate,
-      maxWorkers: parseInt(data.maxWorkers, 10),
+      maxWorkers: data.workers.length,
       signatureDataUrl: data.signatureDataUrl,
-      documents: data.documents,
-      data: { ...data, submittedAt: new Date().toISOString() },
+      documents: [
+        ...data.documents,
+        ...data.workers.flatMap((worker) =>
+          worker.eidCopy ? [{ ...worker.eidCopy, name: `EID-${worker.fullName}-${worker.eidCopy.name}` }] : [],
+        ),
+      ],
+      data: {
+        applicantName: data.applicantName,
+        designation: data.designation,
+        applicantPhone: data.applicantPhone,
+        department: data.department,
+        tradeLicenseNo: data.tradeLicenseNo,
+        supervisorName: data.supervisorName,
+        supervisorPhone: data.supervisorPhone,
+        workDescription: data.workDescription,
+        floorArea: data.floorArea,
+        ppe: data.ppe,
+        submittedAt: new Date().toISOString(),
+      },
+      workers: data.workers.map((worker) => ({
+        fullName: worker.fullName,
+        trade: worker.trade,
+        emiratesId: worker.emiratesId,
+        eidExpiry: worker.eidExpiry,
+        mobile: worker.mobile,
+        inductionDone: worker.inductionDone === "yes",
+      })),
     });
     setSubmitting(false);
     if (!res.ok) { setErrors({ submit: res.error }); return; }
@@ -108,14 +182,43 @@ export function PtwStandardForm() {
 
   if (!hydrated) return null;
 
+  function applyCompany(company: CompanyMatch) {
+    setData({
+      ...data,
+      companyName: company.companyName,
+      tradeLicenseNo: company.tradeLicenseNo || data.tradeLicenseNo,
+      applicantEmail: company.contactEmail || data.applicantEmail,
+      applicantName: company.applicantName || data.applicantName,
+      department: company.department || data.department,
+      supervisorName: company.supervisorName || data.supervisorName,
+      building: company.building || data.building,
+      workers: company.workers.length
+        ? company.workers.map((worker) => ({
+            fullName: worker.fullName,
+            trade: worker.trade,
+            emiratesId: worker.emiratesId,
+            eidExpiry: worker.eidExpiry,
+            mobile: worker.mobile,
+            inductionDone: "no" as const,
+          }))
+        : data.workers,
+    });
+  }
+
   return (
+    <div className="space-y-4">
     <FormWizard step={step} totalSteps={5} stepTitle={["Applicant", "Work", "Dates", "PPE & docs", "Sign"] [step - 1]} onBack={() => setStep((s) => s - 1)} onNext={() => validate(step) && setStep((s) => s + 1)} isLast={step === 5} onSubmit={handleSubmit} submitting={submitting}>
       {step === 1 && (
         <div className="grid gap-3">
           <Input value={data.companyName} onChange={(e) => setData({ ...data, companyName: e.target.value })} placeholder="Company *" />
+          <Input value={data.tradeLicenseNo} onChange={(e) => setData({ ...data, tradeLicenseNo: e.target.value })} placeholder="Trade license no." />
           <Input value={data.applicantName} onChange={(e) => setData({ ...data, applicantName: e.target.value })} placeholder="Applicant name *" />
+          <Input value={data.designation} onChange={(e) => setData({ ...data, designation: e.target.value })} placeholder="Designation" />
           <Input type="email" value={data.applicantEmail} onChange={(e) => setData({ ...data, applicantEmail: e.target.value })} placeholder="Email *" />
-          <Input value={data.department} onChange={(e) => setData({ ...data, department: e.target.value })} placeholder="SMA department *" />
+          <Input value={data.applicantPhone} onChange={(e) => setData({ ...data, applicantPhone: e.target.value })} placeholder="Applicant contact no." />
+          <Input value={data.supervisorName} onChange={(e) => setData({ ...data, supervisorName: e.target.value })} placeholder="Site supervisor" />
+          <Input value={data.supervisorPhone} onChange={(e) => setData({ ...data, supervisorPhone: e.target.value })} placeholder="Site contact no." />
+          <Input value={data.department} onChange={(e) => setData({ ...data, department: e.target.value })} placeholder="SMA requesting department *" />
         </div>
       )}
       {step === 2 && <Textarea value={data.workDescription} onChange={(e) => setData({ ...data, workDescription: e.target.value })} placeholder="Scope (min 30 characters) *" />}
@@ -133,13 +236,19 @@ export function PtwStandardForm() {
             <label key={p} className="flex gap-2 text-sm"><Checkbox checked={data.ppe.includes(p)} onCheckedChange={(c) => setData({ ...data, ppe: c ? [...data.ppe, p] : data.ppe.filter((x) => x !== p) })} />{p}</label>
           ))}
           <FileUploadField
-            label="Method statement, trade license, and IDs"
+            label="Method statement, trade license, and certificates"
             files={data.documents}
             onChange={(f) => setData({ ...data, documents: f })}
             multiple
             required
           />
           <FieldError message={errors.documents} />
+          <WorkersEditor
+            workers={data.workers}
+            savedWorkers={savedWorkers}
+            onChange={(workers) => setData({ ...data, workers })}
+            errors={errors}
+          />
         </>
       )}
       {step === 5 && (
@@ -155,5 +264,7 @@ export function PtwStandardForm() {
         </>
       )}
     </FormWizard>
+    <CompanyPicker query={data.companyName} onSelect={applyCompany} />
+    </div>
   );
 }

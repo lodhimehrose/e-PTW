@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { format } from "date-fns";
-import { ClipboardList, HardHat, Siren } from "lucide-react";
+import { HardHat, Siren } from "lucide-react";
 import { PortalFrame } from "@/components/portal-frame";
 import { StatusBadge } from "@/components/status-badge";
 import { requirePortalUser, submissionTypeLabel } from "@/lib/portal";
@@ -9,9 +9,8 @@ import { createdAtBounds } from "@/lib/date-range";
 import { DateRangeFilter } from "@/components/admin/date-range-filter";
 
 const forms = [
-  { href: "/gate-pass", title: "Gate Pass", ref: "Form-08", icon: ClipboardList },
   { href: "/ptw/standard", title: "Standard PTW", ref: "Form-07", icon: HardHat },
-  { href: "/ptw/emergency", title: "Emergency PTW", ref: "Form-07A", icon: Siren },
+  { href: "/ptw/emergency", title: "Emergency breakdown PTW", ref: "Form-07A", icon: Siren },
 ];
 
 export default async function PortalPage({
@@ -54,7 +53,7 @@ export default async function PortalPage({
         </div>
       </div>
 
-      <div className="mt-6 grid gap-4 md:grid-cols-3">
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
         {forms.map((form) => (
           <Link
             key={form.href}

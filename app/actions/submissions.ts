@@ -6,8 +6,8 @@ import { createServiceClient, createAuthServerClient } from "@/lib/supabase/serv
 import { checkRateLimit } from "@/lib/rate-limit";
 import { revalidatePath } from "next/cache";
 import { uploadBuffer, uploadDataUrl } from "@/lib/storage";
-import { renderSubmissionPdf } from "@/lib/pdf/render";
 import { formDisplayName, sendEmail } from "@/lib/email/send";
+import { EHS_INBOX } from "@/lib/constants";
 import { randomUUID } from "crypto";
 
 const ALLOWED_UPLOADS = new Set([
@@ -139,6 +139,7 @@ export async function submitForm(payload: SubmitPayload) {
   delete storedData.documents;
   delete storedData.signatureDataUrl;
   delete storedData.honeypot;
+  delete storedData.workers;
 
   const { data: row, error } = await supabase
     .from("submissions")
@@ -168,12 +169,13 @@ export async function submitForm(payload: SubmitPayload) {
   const submissionId = row.id as string;
 
   if (payload.signatureDataUrl) {
-    const sigPath = `${submissionId}/signature.png`;
-    await uploadDataUrl(sigPath, payload.signatureDataUrl);
-    await supabase
-      .from("submissions")
-      .update({ signature_url: sigPath })
-      .eq("id", submissionId);
+    try {
+      const sigPath = `${submissionId}/signature.png`;
+      await uploadDataUrl(sigPath, payload.signatureDataUrl);
+      await supabase.from("submissions").update({ signature_url: sigPath }).eq("id", submissionId);
+    } catch (error) {
+      console.error(error);
+    }
   }
 
   if (payload.documents?.length) {
@@ -244,33 +246,66 @@ export async function submitForm(payload: SubmitPayload) {
     .select("*")
     .eq("submission_id", submissionId);
 
-  const pdfBuf = await renderSubmissionPdf({
-    refNo,
-    type: payload.type,
-    formTitle: formDisplayName(payload.type),
-    companyName: payload.companyName,
-    status: "pending",
-    data: payload.data,
-    workers: workers ?? [],
-  });
-
-  const pdfPath = `${submissionId}/submitted.pdf`;
-  await uploadBuffer(pdfPath, pdfBuf, "application/pdf");
-  await supabase
-    .from("submissions")
-    .update({ pdf_url: pdfPath })
-    .eq("id", submissionId);
+  let gateRef = "";
+  if (payload.type === "ptw_standard" || payload.type === "ptw_emergency") {
+    const { data: gateNo } = await supabase.rpc("next_ref_no", { p_type: "gate_pass" });
+    if (gateNo) {
+      const { data: gate } = await supabase
+        .from("submissions")
+        .insert({
+          type: "gate_pass",
+          ref_no: gateNo,
+          status: "pending",
+          company_name: payload.companyName,
+          contact_email: payload.contactEmail,
+          building: payload.building ?? null,
+          start_at: payload.startAt ?? null,
+          end_at: payload.endAt ?? null,
+          max_workers: payload.workers?.length ?? payload.maxWorkers ?? null,
+          linked_ref_no: refNo,
+          owner_id: ownerId,
+          data: {
+            autoCreated: true,
+            sourcePermit: refNo,
+            form: payload.type === "ptw_emergency" ? "Form-08A" : "Form-08",
+            purpose: String(storedData.workDescription || storedData.workScope || storedData.purpose || ""),
+          },
+          verify_token: randomUUID(),
+        })
+        .select("id")
+        .single();
+      if (gate?.id) {
+        if (workers?.length) {
+          await supabase.from("workers").insert(
+            workers.map((worker) => ({
+              submission_id: gate.id,
+              full_name: worker.full_name,
+              trade: worker.trade,
+              emirates_id: worker.emirates_id,
+              eid_expiry: worker.eid_expiry,
+              mobile: worker.mobile,
+              induction_done: worker.induction_done ?? false,
+            })),
+          );
+        }
+        gateRef = String(gateNo);
+      }
+    }
+  }
 
   const site = process.env.NEXT_PUBLIC_SITE_URL ?? "";
   const formName = formDisplayName(payload.type);
   const urgent = payload.type === "ptw_emergency" ? "URGENT – " : "";
+  const gateLine = gateRef
+    ? `<p>A ${payload.type === "ptw_emergency" ? "emergency" : "contractor"} gate pass <strong>${gateRef}</strong> was created from these details. It is approved when this permit is approved.</p>`
+    : "";
 
   await sendEmail({
     to: payload.contactEmail,
     subject: `${urgent}We received your ${formName} – Ref ${refNo}`,
     html: `<p>Thank you. Your submission <strong>${refNo}</strong> is <strong>Pending</strong> review.</p>
+      ${gateLine}
       <p><a href="${site}/portal/status">Track this application by email</a></p>`,
-    attachments: [{ filename: `${refNo}.pdf`, content: pdfBuf }],
   });
 
   const { data: settings } = await supabase
@@ -285,6 +320,7 @@ export async function submitForm(payload: SubmitPayload) {
         ? settings?.ptw_emergency_recipients
         : settings?.ptw_standard_recipients;
   const receivers = uniqueEmails([
+    EHS_INBOX,
     process.env.ADMIN_EMAIL,
     ...splitEmails(configured),
   ]);
@@ -294,11 +330,11 @@ export async function submitForm(payload: SubmitPayload) {
       subject: `${urgent}New ${formName} – ${payload.companyName} – ${refNo}`,
       html: `<p><strong>${payload.companyName}</strong> submitted a ${formName}.</p>
         <p>Reference: <strong>${refNo}</strong></p>
+        ${gateRef ? `<p>Gate pass: <strong>${gateRef}</strong></p>` : ""}
         <p>Contact: ${payload.contactEmail}</p>
         <p>Location: ${payload.building ?? "—"}</p>
-        <p>Attached files: ${payload.documents?.length ?? 0}</p>
+        <p>Workers: ${workers?.length ?? 0}</p>
         <p><a href="${site}/admin/submissions/${submissionId}">Open this submission</a></p>`,
-      attachments: [{ filename: `${refNo}.pdf`, content: pdfBuf }],
     });
   }
 

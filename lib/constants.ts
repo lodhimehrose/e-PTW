@@ -48,4 +48,6 @@ export const FORM_REFS = {
   ptw_emergency: "EHSQ/SMA/2026/PTW/Form-07A Rev.00",
 } as const;
 
+export const EHS_INBOX = "ehs@sma.ac.ae";
+
 export const DUBAI_TZ = "Asia/Dubai";

@@ -114,6 +114,17 @@ export async function decideSubmission(
 
   revalidatePath("/admin");
   revalidatePath(`/admin/submissions/${id}`);
+  if (sub.type !== "gate_pass") {
+    await supabase
+      .from("submissions")
+      .update({
+        status,
+        decision_note: note || (decision === "rejected" ? null : "Issued with the approved permit"),
+        approved_at: decision === "rejected" ? null : now,
+      })
+      .eq("linked_ref_no", sub.ref_no)
+      .eq("type", "gate_pass");
+  }
   return { ok: true as const };
 }
 

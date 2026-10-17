@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FormWizard } from "@/components/form-wizard";
 import { Input } from "@/components/ui/input";
@@ -13,12 +13,10 @@ import { WorkersEditor } from "@/components/workers-editor";
 import { useFormDraft } from "@/hooks/use-form-draft";
 import { FileUploadField } from "@/components/file-upload-field";
 import { submitForm, type FilePayload } from "@/app/actions/submissions";
-import {
-  validateEidAfterWorkEnd,
-  validateWorkersEidUnique,
-  workerSchema,
-  type WorkerInput,
-} from "@/lib/validations/worker";
+import { workerFieldError, validateEidAfterWorkEnd, validateWorkersEidUnique, type WorkerInput } from "@/lib/validations/worker";
+import { loadRoster, type SavedWorker } from "@/app/actions/roster";
+import { CompanyPicker } from "@/components/company-picker";
+import type { CompanyMatch } from "@/app/actions/roster";
 import { format } from "date-fns";
 
 const APPENDIX_B = `1. Emergency breakdowns only — cannot wait 3 working days.
@@ -90,17 +88,40 @@ export function PtwEmergencyForm() {
   const [step, setStep] = useState(1);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [savedWorkers, setSavedWorkers] = useState<SavedWorker[]>([]);
+  const rosterOnce = useRef(false);
   const maxW = parseInt(data.maxWorkers, 10) || 30;
   const workEnd = data.validUntil?.slice(0, 10);
+
+  useEffect(() => {
+    if (!hydrated || rosterOnce.current) return;
+    rosterOnce.current = true;
+    loadRoster().then((roster) => {
+      setSavedWorkers(roster.workers);
+      if (!roster.company) return;
+      setData((current) => ({
+        ...current,
+        companyName: current.companyName || roster.company?.companyName || "",
+        contactEmail: current.contactEmail || roster.company?.contactEmail || "",
+        tradeLicenseNo: current.tradeLicenseNo || roster.company?.tradeLicenseNo || "",
+        building: current.building || roster.company?.building || current.building,
+      }));
+    });
+  }, [hydrated, setData]);
 
   function validate(s: number) {
     const e: Record<string, string> = {};
     if (s === 1 && (!data.reportedBy || !data.description || data.risks.length === 0)) e.description = "Complete step 1";
     if (s === 2) {
       if (!data.companyName || !data.contactEmail) e.companyName = "Required";
-      if (data.workers.some((w, i) => !workerSchema.safeParse(w).success)) e.workers = "Complete workers";
-      if (!validateWorkersEidUnique(data.workers)) e.workers = "Duplicate EID";
-      if (data.workers.length > maxW) e.workers = `Max ${maxW}`;
+      data.workers.forEach((worker, index) => {
+        const message = workerFieldError(worker);
+        if (message) e[`workers.${index}`] = message;
+      });
+      if (!validateWorkersEidUnique(data.workers)) e.workers = "Duplicate Emirates ID";
+      if (workEnd && !validateEidAfterWorkEnd(data.workers, workEnd)) {
+        e.workers = "A worker's Emirates ID expires before the job ends";
+      }
     }
     if (s === 3 && (!data.workScope || !data.validUntil)) e.workScope = "Required";
     if (s === 4 && data.safetyControls.length !== SAFETY_CONTROLS.length) e.safety = "Confirm all 8";
@@ -125,8 +146,25 @@ export function PtwEmergencyForm() {
       endAt: data.validUntil,
       maxWorkers: maxW,
       signatureDataUrl: data.signatureDataUrl,
-      documents: data.documents,
-      data: { ...data, urgent: true, submittedAt: new Date().toISOString() },
+      documents: [
+        ...data.documents,
+        ...data.workers.flatMap((worker) =>
+          worker.eidCopy
+            ? [{ ...worker.eidCopy, name: `EID-${worker.fullName}-${worker.eidCopy.name}` }]
+            : [],
+        ),
+      ],
+      data: {
+        reportedBy: data.reportedBy,
+        department: data.department,
+        description: data.description,
+        risks: data.risks,
+        tradeLicenseNo: data.tradeLicenseNo,
+        workScope: data.workScope,
+        safetyControls: data.safetyControls,
+        urgent: true,
+        submittedAt: new Date().toISOString(),
+      },
       workers: data.workers.map((w) => ({
         fullName: w.fullName,
         trade: w.trade,
@@ -144,7 +182,28 @@ export function PtwEmergencyForm() {
 
   if (!hydrated) return null;
 
+  function applyCompany(company: CompanyMatch) {
+    setData({
+      ...data,
+      companyName: company.companyName,
+      contactEmail: company.contactEmail || data.contactEmail,
+      tradeLicenseNo: company.tradeLicenseNo || data.tradeLicenseNo,
+      building: company.building || data.building,
+      workers: company.workers.length
+        ? company.workers.map((worker) => ({
+            fullName: worker.fullName,
+            trade: worker.trade,
+            emiratesId: worker.emiratesId,
+            eidExpiry: worker.eidExpiry,
+            mobile: worker.mobile,
+            inductionDone: "no" as const,
+          }))
+        : data.workers,
+    });
+  }
+
   return (
+    <div className="space-y-4">
     <FormWizard step={step} totalSteps={5} stepTitle={STEPS[step - 1]} onBack={() => setStep((s) => s - 1)} onNext={() => validate(step) && setStep((s) => s + 1)} isLast={step === 5} onSubmit={handleSubmit} submitting={submitting}>
       {step === 1 && (
         <div className="space-y-3">
@@ -160,7 +219,12 @@ export function PtwEmergencyForm() {
         <>
           <Input value={data.companyName} onChange={(e) => setData({ ...data, companyName: e.target.value })} placeholder="Company *" />
           <Input type="email" value={data.contactEmail} onChange={(e) => setData({ ...data, contactEmail: e.target.value })} placeholder="Email *" />
-          <WorkersEditor workers={data.workers} onChange={(w) => setData({ ...data, workers: w })} workEndDate={workEnd} maxWorkers={maxW} errors={errors} />
+          <WorkersEditor
+            workers={data.workers}
+            savedWorkers={savedWorkers}
+            onChange={(w) => setData({ ...data, workers: w })}
+            errors={errors}
+          />
         </>
       )}
       {step === 3 && (
@@ -188,5 +252,7 @@ export function PtwEmergencyForm() {
         </>
       )}
     </FormWizard>
+    <CompanyPicker query={data.companyName} onSelect={applyCompany} />
+    </div>
   );
 }
