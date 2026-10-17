@@ -1,5 +1,7 @@
 "use server";
 
+import { cookies } from "next/headers";
+import { isAdminEmail } from "@/lib/auth";
 import { createServiceClient, createAuthServerClient } from "@/lib/supabase/server";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { revalidatePath } from "next/cache";
@@ -55,7 +57,13 @@ export async function submitForm(payload: SubmitPayload) {
     const {
       data: { user },
     } = await auth.auth.getUser();
-    if (user) ownerId = user.id;
+    if (user) {
+      ownerId = user.id;
+      if (isAdminEmail(user.email)) {
+        const actAs = (await cookies()).get("sma_act_as")?.value;
+        if (actAs) ownerId = actAs;
+      }
+    }
   } catch {
     ownerId = null;
   }

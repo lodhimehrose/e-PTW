@@ -11,6 +11,7 @@ export default async function ProfilePage() {
         company={user.company}
         phone={user.phone}
         email={user.email}
+        viewingAsAdmin={user.viewingAsAdmin}
       />
     </PortalFrame>
   );

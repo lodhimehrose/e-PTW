@@ -2,19 +2,29 @@
 
 import { usePathname } from "next/navigation";
 import { AdminSidebar } from "./sidebar";
+import { AccountSwitcher } from "./account-switcher";
 import { SignOutButton } from "@/components/sign-out-button";
 
-export function AdminShell({ children }: { children: React.ReactNode }) {
+export function AdminShell({
+  children,
+  accounts,
+}: {
+  children: React.ReactNode;
+  accounts: { id: string; email: string; name: string }[];
+}) {
   const path = usePathname();
   if (path === "/admin/login") {
     return <>{children}</>;
   }
   return (
     <div className="flex min-h-screen bg-background">
-      <AdminSidebar />
+      <AdminSidebar accounts={accounts} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex items-center justify-between border-b border-border px-4 py-3 md:hidden">
-          <p className="text-sm font-semibold text-foreground">SMA Admin</p>
+        <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 md:hidden">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-foreground">SMA Admin</p>
+            <AccountSwitcher accounts={accounts} />
+          </div>
           <SignOutButton redirectTo="/admin/login" />
         </div>
         <div className="flex-1 p-4 md:p-8">{children}</div>

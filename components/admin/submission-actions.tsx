@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,17 +21,19 @@ export function SubmissionActions({
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
+  const router = useRouter();
 
   async function decide(decision: "approved" | "approved_with_conditions" | "rejected") {
     setLoading(true);
     const res = await decideSubmission(id, decision, note);
     setLoading(false);
-    setMsg(res.ok ? "Saved." : res.error ?? "Error");
+    setMsg(res.ok ? "Decision saved." : res.error ?? "Error");
+    if (res.ok) router.refresh();
   }
 
   return (
     <div className="space-y-4 rounded-lg border bg-white p-4">
-      <h3 className="font-semibold text-sma-navy">Decision</h3>
+      <h3 className="font-semibold text-foreground">Approve or reject</h3>
       <Textarea
         placeholder="Conditions or rejection reason"
         value={note}

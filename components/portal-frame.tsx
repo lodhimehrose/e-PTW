@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { exitContractorAccount } from "@/app/actions/accounts";
 import { SignOutButton } from "@/components/sign-out-button";
 import { SiteShell } from "@/components/site-shell";
 import type { PortalUser } from "@/lib/portal";
@@ -29,6 +30,14 @@ export function PortalFrame({
         </div>
         <SignOutButton redirectTo="/portal/login" />
       </div>
+      {user.viewingAsAdmin && (
+        <form action={exitContractorAccount} className="mb-4 rounded-2xl bg-muted px-4 py-3 text-sm text-foreground">
+          <p>You are viewing this contractor account as the EHS officer. They cannot open other accounts.</p>
+          <button type="submit" className="mt-2 font-semibold underline-offset-4 hover:underline">
+            Return to admin
+          </button>
+        </form>
+      )}
       <nav className="mb-6 flex gap-2 text-sm">
         {links.map((link) => (
           <Link

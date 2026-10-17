@@ -11,11 +11,13 @@ export function ProfileForm({
   company,
   phone,
   email,
+  viewingAsAdmin = false,
 }: {
   name: string;
   company: string;
   phone: string;
   email: string;
+  viewingAsAdmin?: boolean;
 }) {
   const [profileMessage, setProfileMessage] = useState("");
   const [profileError, setProfileError] = useState("");
@@ -77,6 +79,7 @@ export function ProfileForm({
         </Button>
       </form>
 
+      {!viewingAsAdmin && (
       <form
         onSubmit={async (e) => {
           e.preventDefault();
@@ -99,6 +102,7 @@ export function ProfileForm({
           {savingPassword ? "Updating…" : "Update password"}
         </Button>
       </form>
+      )}
     </div>
   );
 }

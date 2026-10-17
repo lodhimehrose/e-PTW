@@ -1,7 +1,9 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { createAuthServerClient } from "@/lib/supabase/server";
+import { isAdminEmail } from "@/lib/auth";
+import { createAuthServerClient, createServiceClient } from "@/lib/supabase/server";
 
 export async function updateProfile(formData: FormData) {
   const auth = await createAuthServerClient();
@@ -15,6 +17,18 @@ export async function updateProfile(formData: FormData) {
   const phone = String(formData.get("phone") ?? "").trim();
   if (!fullName || !company) {
     return { ok: false as const, error: "Name and company are required." };
+  }
+
+  const actAs = (await cookies()).get("sma_act_as")?.value;
+  if (actAs && isAdminEmail(user.email)) {
+    const admin = createServiceClient();
+    const { error } = await admin.auth.admin.updateUserById(actAs, {
+      user_metadata: { full_name: fullName, company_name: company, phone },
+    });
+    if (error) return { ok: false as const, error: error.message };
+    revalidatePath("/portal");
+    revalidatePath("/portal/profile");
+    return { ok: true as const };
   }
 
   const { error } = await auth.auth.updateUser({
@@ -32,6 +46,10 @@ export async function updatePassword(formData: FormData) {
     data: { user },
   } = await auth.auth.getUser();
   if (!user) return { ok: false as const, error: "Sign in again to change your password." };
+  const actAs = (await cookies()).get("sma_act_as")?.value;
+  if (actAs && isAdminEmail(user.email)) {
+    return { ok: false as const, error: "Only the account owner can change this password." };
+  }
 
   const password = String(formData.get("password") ?? "");
   const confirm = String(formData.get("confirm") ?? "");

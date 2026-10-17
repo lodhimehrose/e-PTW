@@ -226,3 +226,107 @@ export async function saveSettings(form: {
   revalidatePath("/admin/settings");
   return { ok: true as const };
 }
+
+export async function updateSubmissionFields(
+  id: string,
+  fields: {
+    companyName: string;
+    contactEmail: string;
+    building: string;
+    data: Record<string, string>;
+  },
+) {
+  const { user } = await requireAdmin();
+  const supabase = createServiceClient();
+  const { data: sub } = await supabase
+    .from("submissions")
+    .select("data")
+    .eq("id", id)
+    .single();
+  if (!sub) return { ok: false as const, error: "Not found" };
+  const data = {
+    ...((sub.data as Record<string, unknown>) ?? {}),
+    ...fields.data,
+  };
+  await supabase
+    .from("submissions")
+    .update({
+      company_name: fields.companyName,
+      contact_email: fields.contactEmail,
+      building: fields.building || null,
+      data,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+  await supabase.from("audit_log").insert({
+    submission_id: id,
+    action: "edited",
+    note: "Admin corrected form details",
+    actor: user.email,
+  });
+  revalidatePath(`/admin/submissions/${id}`);
+  return { ok: true as const };
+}
+
+export async function issueGatePass(
+  permitId: string,
+  input: {
+    companyName: string;
+    contactEmail: string;
+    building: string;
+    purpose: string;
+    entryFrom: string;
+    entryTo: string;
+  },
+) {
+  const { user } = await requireAdmin();
+  const supabase = createServiceClient();
+  const { data: permit } = await supabase
+    .from("submissions")
+    .select("id, ref_no, type, owner_id, company_name, contact_email, building")
+    .eq("id", permitId)
+    .single();
+  if (!permit) return { ok: false as const, error: "Permit not found" };
+  if (permit.type === "gate_pass") {
+    return { ok: false as const, error: "This record is already a gate pass." };
+  }
+
+  const { data: refNo, error: refErr } = await supabase.rpc("next_ref_no", {
+    p_type: "gate_pass",
+  });
+  if (refErr || !refNo) return { ok: false as const, error: "Could not create a reference number." };
+
+  const { data: row, error } = await supabase
+    .from("submissions")
+    .insert({
+      type: "gate_pass",
+      ref_no: refNo,
+      status: "approved",
+      company_name: input.companyName || permit.company_name,
+      contact_email: input.contactEmail || permit.contact_email,
+      building: input.building || permit.building,
+      owner_id: permit.owner_id,
+      linked_ref_no: permit.ref_no,
+      approved_at: new Date().toISOString(),
+      data: {
+        purpose: input.purpose,
+        entryFrom: input.entryFrom,
+        entryTo: input.entryTo,
+        issuedByAdmin: true,
+        linkedPermitRef: permit.ref_no,
+      },
+    })
+    .select("id, ref_no")
+    .single();
+
+  if (error || !row) return { ok: false as const, error: error?.message ?? "Could not issue gate pass." };
+
+  await supabase.from("audit_log").insert({
+    submission_id: row.id,
+    action: "gate_pass_issued",
+    note: `Issued from ${permit.ref_no}`,
+    actor: user.email,
+  });
+  revalidatePath("/admin/submissions");
+  return { ok: true as const, id: row.id as string, refNo: row.ref_no as string };
+}

@@ -3,6 +3,7 @@ import Image from "next/image";
 import { LayoutDashboard, FileText, QrCode, Settings } from "lucide-react";
 import { SignOutButton } from "@/components/sign-out-button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { AccountSwitcher } from "./account-switcher";
 
 const links = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
@@ -11,7 +12,11 @@ const links = [
   { href: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
-export function AdminSidebar() {
+export function AdminSidebar({
+  accounts,
+}: {
+  accounts: { id: string; email: string; name: string }[];
+}) {
   return (
     <aside className="hidden w-56 shrink-0 flex-col border-r border-border bg-card md:flex">
       <div className="flex items-center gap-3 border-b p-4">
@@ -21,6 +26,7 @@ export function AdminSidebar() {
           <p className="text-xs text-muted-foreground">EHS Officer</p>
         </div>
       </div>
+      <AccountSwitcher accounts={accounts} />
       <div className="px-3 pt-3">
         <ThemeToggle tone="onLight" />
       </div>
