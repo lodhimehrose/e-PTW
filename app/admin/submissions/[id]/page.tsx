@@ -163,15 +163,19 @@ export default async function SubmissionDetailPage({
         {documents.length === 0 && !pdfLink && (
           <p className="mt-3 text-sm text-muted-foreground">No files were attached.</p>
         )}
-        <ul className="mt-3 space-y-2 text-sm">
+        <ul className="mt-3 space-y-4 text-sm">
           {documents.map((doc) => (
             <li key={doc.id}>
               {doc.href ? (
-                <a href={doc.href} target="_blank" rel="noreferrer" className="underline">
+                <a href={doc.href} target="_blank" rel="noreferrer" className="font-medium underline">
                   {doc.file_name || doc.doc_type}
                 </a>
               ) : (
                 <span>{doc.file_name || doc.doc_type} (file unavailable)</span>
+              )}
+              {doc.href && /\.(png|jpe?g|gif|webp|bmp)$/i.test(doc.file_name || "") && (
+                // Signed storage URLs are temporary, so a plain image is used.
+                <img src={doc.href} alt={doc.file_name || "Attachment"} className="mt-2 max-h-64 rounded-lg border border-border" />
               )}
             </li>
           ))}

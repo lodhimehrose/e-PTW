@@ -74,6 +74,7 @@ export function PtwStandardForm() {
       if (data.startDate && new Date(data.startDate) < min) e.startDate = "notice";
     }
     if (s === 4 && data.ppe.length === 0) e.ppe = "Select PPE";
+    if (s === 4 && data.documents.length === 0) e.documents = "Attach the method statement, trade license, or IDs";
     if (s === 5) {
       if (!data.hseAck.A) e.hse = "Acknowledge HSE";
       if (!data.undertakings.every(Boolean)) e.undertakings = "All undertakings";
@@ -131,7 +132,14 @@ export function PtwStandardForm() {
           {["Fire extinguishers", "Helmet & shoes", "Safety vest"].map((p) => (
             <label key={p} className="flex gap-2 text-sm"><Checkbox checked={data.ppe.includes(p)} onCheckedChange={(c) => setData({ ...data, ppe: c ? [...data.ppe, p] : data.ppe.filter((x) => x !== p) })} />{p}</label>
           ))}
-          <FileUploadField label="Method statement, trade license, IDs (PDF/JPG)" files={data.documents} onChange={(f) => setData({ ...data, documents: f })} multiple />
+          <FileUploadField
+            label="Method statement, trade license, and IDs"
+            files={data.documents}
+            onChange={(f) => setData({ ...data, documents: f })}
+            multiple
+            required
+          />
+          <FieldError message={errors.documents} />
         </>
       )}
       {step === 5 && (

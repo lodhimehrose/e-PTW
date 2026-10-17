@@ -10,6 +10,63 @@ import { renderSubmissionPdf } from "@/lib/pdf/render";
 import { formDisplayName, sendEmail } from "@/lib/email/send";
 import { randomUUID } from "crypto";
 
+const ALLOWED_UPLOADS = new Set([
+  ".pdf",
+  ".doc",
+  ".docx",
+  ".xls",
+  ".xlsx",
+  ".csv",
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".gif",
+  ".webp",
+  ".bmp",
+  ".heic",
+  ".tif",
+  ".tiff",
+]);
+
+const MIME_BY_EXT: Record<string, string> = {
+  ".pdf": "application/pdf",
+  ".doc": "application/msword",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".xls": "application/vnd.ms-excel",
+  ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ".csv": "text/csv",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+  ".bmp": "image/bmp",
+  ".heic": "image/heic",
+  ".tif": "image/tiff",
+  ".tiff": "image/tiff",
+};
+
+function splitEmails(value: string | null | undefined) {
+  return (value ?? "")
+    .split(/[,;\n]+/)
+    .map((email) => email.trim())
+    .filter((email) => email.includes("@"));
+}
+
+function uniqueEmails(values: Array<string | undefined>) {
+  const seen = new Set<string>();
+  const emails: string[] = [];
+  for (const value of values) {
+    const email = value?.trim();
+    if (!email || !email.includes("@")) continue;
+    const key = email.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    emails.push(email);
+  }
+  return emails;
+}
+
 export type FilePayload = {
   name: string;
   type: string;
@@ -77,6 +134,12 @@ export async function submitForm(payload: SubmitPayload) {
     return { ok: false as const, error: "Could not generate reference number." };
   }
 
+  const storedData = { ...payload.data };
+  delete storedData.uploads;
+  delete storedData.documents;
+  delete storedData.signatureDataUrl;
+  delete storedData.honeypot;
+
   const { data: row, error } = await supabase
     .from("submissions")
     .insert({
@@ -91,7 +154,7 @@ export async function submitForm(payload: SubmitPayload) {
       max_workers: payload.maxWorkers ?? null,
       linked_ref_no: payload.linkedRefNo ?? null,
       owner_id: ownerId,
-      data: payload.data,
+      data: storedData,
       verify_token: randomUUID(),
     })
     .select("id, ref_no")
@@ -115,16 +178,25 @@ export async function submitForm(payload: SubmitPayload) {
 
   if (payload.documents?.length) {
     for (const doc of payload.documents) {
-      const buf = Buffer.from(doc.base64, "base64");
-      const safe = doc.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const path = `${submissionId}/docs/${safe}`;
-      await uploadBuffer(path, buf, doc.type || "application/octet-stream");
-      await supabase.from("documents").insert({
-        submission_id: submissionId,
-        doc_type: "upload",
-        file_url: path,
-        file_name: doc.name,
-      });
+      const ext = doc.name.includes(".") ? doc.name.slice(doc.name.lastIndexOf(".")).toLowerCase() : "";
+      if (!ALLOWED_UPLOADS.has(ext)) {
+        return { ok: false as const, error: `${doc.name} is not an allowed file. Use PDF, Word, Excel, or a picture.` };
+      }
+      try {
+        const buf = Buffer.from(doc.base64, "base64");
+        const safe = doc.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const path = `${submissionId}/docs/${randomUUID()}-${safe}`;
+        await uploadBuffer(path, buf, doc.type || MIME_BY_EXT[ext] || "application/octet-stream");
+        await supabase.from("documents").insert({
+          submission_id: submissionId,
+          doc_type: ext.replace(".", "") || "upload",
+          file_url: path,
+          file_name: doc.name,
+        });
+      } catch (uploadError) {
+        console.error(uploadError);
+        return { ok: false as const, error: `Could not save ${doc.name}. Try a smaller PDF, Word, Excel, or picture file.` };
+      }
     }
   }
 
@@ -197,19 +269,35 @@ export async function submitForm(payload: SubmitPayload) {
     to: payload.contactEmail,
     subject: `${urgent}We received your ${formName} – Ref ${refNo}`,
     html: `<p>Thank you. Your submission <strong>${refNo}</strong> is <strong>Pending</strong> review.</p>
-      <p><a href="${site}/status">Check status</a></p>`,
+      <p><a href="${site}/portal/status">Track this application by email</a></p>`,
     attachments: [{ filename: `${refNo}.pdf`, content: pdfBuf }],
   });
 
-  const admin = process.env.ADMIN_EMAIL;
-  if (admin) {
+  const { data: settings } = await supabase
+    .from("settings")
+    .select("gate_pass_recipients, ptw_standard_recipients, ptw_emergency_recipients")
+    .limit(1)
+    .maybeSingle();
+  const configured =
+    payload.type === "gate_pass"
+      ? settings?.gate_pass_recipients
+      : payload.type === "ptw_emergency"
+        ? settings?.ptw_emergency_recipients
+        : settings?.ptw_standard_recipients;
+  const receivers = uniqueEmails([
+    process.env.ADMIN_EMAIL,
+    ...splitEmails(configured),
+  ]);
+  for (const to of receivers) {
     await sendEmail({
-      to: admin,
+      to,
       subject: `${urgent}New ${formName} – ${payload.companyName} – ${refNo}`,
-      html: `<p><strong>${payload.companyName}</strong></p>
+      html: `<p><strong>${payload.companyName}</strong> submitted a ${formName}.</p>
+        <p>Reference: <strong>${refNo}</strong></p>
+        <p>Contact: ${payload.contactEmail}</p>
         <p>Location: ${payload.building ?? "—"}</p>
-        <p>Max workers: ${payload.maxWorkers ?? "—"}</p>
-        <p><a href="${site}/admin/submissions/${submissionId}">Review in admin panel</a></p>`,
+        <p>Attached files: ${payload.documents?.length ?? 0}</p>
+        <p><a href="${site}/admin/submissions/${submissionId}">Open this submission</a></p>`,
       attachments: [{ filename: `${refNo}.pdf`, content: pdfBuf }],
     });
   }

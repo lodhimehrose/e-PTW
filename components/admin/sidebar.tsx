@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { LayoutDashboard, FileText, QrCode, Settings } from "lucide-react";
+import { LayoutDashboard, FileText, Search, QrCode, Settings } from "lucide-react";
 import { SignOutButton } from "@/components/sign-out-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { AccountSwitcher } from "./account-switcher";
@@ -8,6 +8,7 @@ import { AccountSwitcher } from "./account-switcher";
 const links = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/submissions", label: "Submissions", icon: FileText },
+  { href: "/admin/status", label: "Track status", icon: Search },
   { href: "/admin/qr", label: "QR Codes", icon: QrCode },
   { href: "/admin/settings", label: "Settings", icon: Settings },
 ];

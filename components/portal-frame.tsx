@@ -6,6 +6,7 @@ import type { PortalUser } from "@/lib/portal";
 
 const links = [
   { href: "/portal", label: "Submissions" },
+  { href: "/portal/status", label: "Track status" },
   { href: "/portal/profile", label: "Profile" },
 ];
 

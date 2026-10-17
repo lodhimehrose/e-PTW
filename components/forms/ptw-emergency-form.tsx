@@ -11,7 +11,8 @@ import { FieldError } from "@/components/field-error";
 import { SignaturePadField } from "@/components/signature-pad";
 import { WorkersEditor } from "@/components/workers-editor";
 import { useFormDraft } from "@/hooks/use-form-draft";
-import { submitForm } from "@/app/actions/submissions";
+import { FileUploadField } from "@/components/file-upload-field";
+import { submitForm, type FilePayload } from "@/app/actions/submissions";
 import {
   validateEidAfterWorkEnd,
   validateWorkersEidUnique,
@@ -55,6 +56,7 @@ type Draft = {
   declaration: boolean;
   declarantName: string;
   signatureDataUrl?: string;
+  documents: FilePayload[];
   honeypot: string;
 };
 
@@ -76,6 +78,7 @@ const initial: Draft = {
   safetyControls: [],
   declaration: false,
   declarantName: "",
+  documents: [],
   honeypot: "",
 };
 
@@ -122,6 +125,7 @@ export function PtwEmergencyForm() {
       endAt: data.validUntil,
       maxWorkers: maxW,
       signatureDataUrl: data.signatureDataUrl,
+      documents: data.documents,
       data: { ...data, urgent: true, submittedAt: new Date().toISOString() },
       workers: data.workers.map((w) => ({
         fullName: w.fullName,
@@ -174,6 +178,12 @@ export function PtwEmergencyForm() {
           <Checkbox checked={data.declaration} onCheckedChange={(c) => setData({ ...data, declaration: c === true })} />
           <Input value={data.declarantName} onChange={(e) => setData({ ...data, declarantName: e.target.value })} placeholder="Name *" />
           <SignaturePadField onChange={(u) => setData({ ...data, signatureDataUrl: u })} error={errors.signature} />
+          <FileUploadField
+            label="Supporting files"
+            files={data.documents}
+            onChange={(files) => setData({ ...data, documents: files })}
+            multiple
+          />
           <FieldError message={errors.submit} />
         </>
       )}
