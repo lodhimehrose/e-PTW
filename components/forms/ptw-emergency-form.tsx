@@ -9,15 +9,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FieldError } from "@/components/field-error";
 import { SignaturePadField } from "@/components/signature-pad";
-import { WorkersEditor } from "@/components/workers-editor";
 import { useFormDraft } from "@/hooks/use-form-draft";
 import { FileUploadField } from "@/components/file-upload-field";
 import { submitForm, type FilePayload } from "@/app/actions/submissions";
-import { workerFieldError, validateEidAfterWorkEnd, validateWorkersEidUnique, type WorkerInput } from "@/lib/validations/worker";
-import { loadRoster, type SavedWorker } from "@/app/actions/roster";
+import { formatEmiratesId, workerFieldError, validateEidAfterWorkEnd, type WorkerInput } from "@/lib/validations/worker";
+import { loadRoster } from "@/app/actions/roster";
 import { CompanyPicker } from "@/components/company-picker";
 import type { CompanyMatch } from "@/app/actions/roster";
 import { format } from "date-fns";
+import { SECTION_IV_UNDERTAKINGS } from "@/lib/constants";
 
 const APPENDIX_B = `1. Emergency breakdowns only — cannot wait 3 working days.
 2. Planned works need Standard PTW (Form-07).
@@ -44,6 +44,9 @@ type Draft = {
   risks: string[];
   companyName: string;
   tradeLicenseNo: string;
+  tradeLicenseExpiry: string;
+  tradeLicenseFile?: FilePayload;
+  declarantDesignation: string;
   contactEmail: string;
   maxWorkers: string;
   workers: WorkerInput[];
@@ -52,6 +55,7 @@ type Draft = {
   validUntil: string;
   safetyControls: string[];
   declaration: boolean;
+  undertakings: boolean[];
   declarantName: string;
   signatureDataUrl?: string;
   documents: FilePayload[];
@@ -67,6 +71,9 @@ const initial: Draft = {
   risks: [],
   companyName: "",
   tradeLicenseNo: "",
+  tradeLicenseExpiry: "",
+  declarantDesignation: "",
+  undertakings: [false, false, false, false],
   contactEmail: "",
   maxWorkers: "5",
   workers: [{ fullName: "", trade: "", emiratesId: "", eidExpiry: "", mobile: "", inductionDone: "no" }],
@@ -88,53 +95,74 @@ export function PtwEmergencyForm() {
   const [step, setStep] = useState(1);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
-  const [savedWorkers, setSavedWorkers] = useState<SavedWorker[]>([]);
   const rosterOnce = useRef(false);
-  const maxW = parseInt(data.maxWorkers, 10) || 30;
+  const supervisor = data.workers[0] ?? {
+    fullName: "",
+    trade: "Supervisor",
+    emiratesId: "",
+    eidExpiry: "",
+    mobile: "",
+    inductionDone: "yes" as const,
+  };
   const workEnd = data.validUntil?.slice(0, 10);
+
+  function setSupervisor(patch: Partial<WorkerInput>) {
+    setData({ ...data, workers: [{ ...supervisor, ...patch }], maxWorkers: "1" });
+  }
 
   useEffect(() => {
     if (!hydrated || rosterOnce.current) return;
     rosterOnce.current = true;
     loadRoster().then((roster) => {
-      setSavedWorkers(roster.workers);
-      if (!roster.company) return;
       setData((current) => ({
         ...current,
         companyName: current.companyName || roster.company?.companyName || "",
         contactEmail: current.contactEmail || roster.company?.contactEmail || "",
         tradeLicenseNo: current.tradeLicenseNo || roster.company?.tradeLicenseNo || "",
         building: current.building || roster.company?.building || current.building,
+        maxWorkers: "1",
       }));
     });
   }, [hydrated, setData]);
 
   function validate(s: number) {
     const e: Record<string, string> = {};
+    const today = new Date().toISOString().slice(0, 10);
     if (s === 1 && (!data.reportedBy || !data.description || data.risks.length === 0)) e.description = "Complete step 1";
     if (s === 2) {
-      if (!data.companyName || !data.contactEmail) e.companyName = "Required";
-      data.workers.forEach((worker, index) => {
-        const message = workerFieldError(worker);
-        if (message) e[`workers.${index}`] = message;
-      });
-      if (!validateWorkersEidUnique(data.workers)) e.workers = "Duplicate Emirates ID";
-      if (workEnd && !validateEidAfterWorkEnd(data.workers, workEnd)) {
-        e.workers = "A worker's Emirates ID expires before the job ends";
+      if (!data.companyName || !data.contactEmail) e.companyName = "Company and email are required";
+      if (!data.tradeLicenseNo) e.tradeLicenseNo = "Trade license number is required";
+      if (!data.tradeLicenseExpiry) e.tradeLicenseExpiry = "Trade license expiry is required";
+      else if (data.tradeLicenseExpiry < today) e.tradeLicenseExpiry = "Trade license is expired. Update the trade license before anyone from this company can apply.";
+      if (!data.tradeLicenseFile) e.tradeLicenseFile = "Upload the trade license";
+      const message = workerFieldError(supervisor);
+      if (message) e["workers.0"] = message;
+      if (supervisor.eidExpiry && supervisor.eidExpiry < today) {
+        e["workers.0"] = "The supervisor's Emirates ID is expired. Provide an updated ID.";
+      }
+      if (workEnd && supervisor.eidExpiry && !validateEidAfterWorkEnd([supervisor], workEnd)) {
+        e["workers.0"] = "The supervisor's Emirates ID expires before the job ends. Provide an updated ID.";
       }
     }
     if (s === 3 && (!data.workScope || !data.validUntil)) e.workScope = "Required";
     if (s === 4 && data.safetyControls.length !== SAFETY_CONTROLS.length) e.safety = "Confirm all 8";
     if (s === 5) {
-      if (!data.declaration || !data.declarantName) e.declarantName = "Required";
-      if (!data.signatureDataUrl) e.signature = "Signature required";
+      if (!data.undertakings.every(Boolean)) e.undertakings = "Confirm each statement in Section IV";
+      if (!data.declarantName) e.declarantName = "Name is required";
+      if (!data.declarantDesignation) e.declarantDesignation = "Designation is required";
+      if (!data.signatureDataUrl) e.signature = "Draw or upload a signature";
     }
+    const first = Object.values(e)[0];
+    if (first) e.submit = first;
     setErrors(e);
     return Object.keys(e).length === 0;
   }
 
   async function handleSubmit() {
-    if (!validate(5)) return;
+    for (const stepNumber of [1, 2, 3, 4, 5]) {
+      if (!validate(stepNumber)) return;
+    }
+    const supervisor = data.workers[0];
     setSubmitting(true);
     const res = await submitForm({
       type: "ptw_emergency",
@@ -144,35 +172,39 @@ export function PtwEmergencyForm() {
       building: data.building,
       startAt: data.validFrom,
       endAt: data.validUntil,
-      maxWorkers: maxW,
+      maxWorkers: 1,
       signatureDataUrl: data.signatureDataUrl,
       documents: [
         ...data.documents,
-        ...data.workers.flatMap((worker) =>
-          worker.eidCopy
-            ? [{ ...worker.eidCopy, name: `EID-${worker.fullName}-${worker.eidCopy.name}` }]
-            : [],
-        ),
+        ...(data.tradeLicenseFile ? [{ ...data.tradeLicenseFile, name: `Trade-license-${data.tradeLicenseFile.name}` }] : []),
+        ...(supervisor.eidCopy ? [{ ...supervisor.eidCopy, name: `EID-${supervisor.fullName}-${supervisor.eidCopy.name}` }] : []),
       ],
       data: {
+        reportedAt: data.reportedAt,
         reportedBy: data.reportedBy,
         department: data.department,
         description: data.description,
         risks: data.risks,
         tradeLicenseNo: data.tradeLicenseNo,
+        tradeLicenseExpiry: data.tradeLicenseExpiry,
+        declarantName: data.declarantName,
+        declarantDesignation: data.declarantDesignation,
         workScope: data.workScope,
+        validFrom: data.validFrom,
+        validUntil: data.validUntil,
         safetyControls: data.safetyControls,
+        undertakings: SECTION_IV_UNDERTAKINGS.filter((_, index) => data.undertakings[index]),
         urgent: true,
         submittedAt: new Date().toISOString(),
       },
-      workers: data.workers.map((w) => ({
-        fullName: w.fullName,
-        trade: w.trade,
-        emiratesId: w.emiratesId,
-        eidExpiry: w.eidExpiry,
-        mobile: w.mobile,
-        inductionDone: w.inductionDone === "yes",
-      })),
+      workers: [{
+        fullName: supervisor.fullName,
+        trade: supervisor.trade || "Supervisor",
+        emiratesId: supervisor.emiratesId,
+        eidExpiry: supervisor.eidExpiry,
+        mobile: supervisor.mobile,
+        inductionDone: true,
+      }],
     });
     setSubmitting(false);
     if (!res.ok) { setErrors({ submit: res.error }); return; }
@@ -189,16 +221,6 @@ export function PtwEmergencyForm() {
       contactEmail: company.contactEmail || data.contactEmail,
       tradeLicenseNo: company.tradeLicenseNo || data.tradeLicenseNo,
       building: company.building || data.building,
-      workers: company.workers.length
-        ? company.workers.map((worker) => ({
-            fullName: worker.fullName,
-            trade: worker.trade,
-            emiratesId: worker.emiratesId,
-            eidExpiry: worker.eidExpiry,
-            mobile: worker.mobile,
-            inductionDone: "no" as const,
-          }))
-        : data.workers,
     });
   }
 
@@ -218,13 +240,51 @@ export function PtwEmergencyForm() {
       {step === 2 && (
         <>
           <Input value={data.companyName} onChange={(e) => setData({ ...data, companyName: e.target.value })} placeholder="Company *" />
-          <Input type="email" value={data.contactEmail} onChange={(e) => setData({ ...data, contactEmail: e.target.value })} placeholder="Email *" />
-          <WorkersEditor
-            workers={data.workers}
-            savedWorkers={savedWorkers}
-            onChange={(w) => setData({ ...data, workers: w })}
-            errors={errors}
+          <Input value={data.tradeLicenseNo} onChange={(e) => setData({ ...data, tradeLicenseNo: e.target.value })} placeholder="Trade license no. *" />
+          <FieldError message={errors.tradeLicenseNo} />
+          <div>
+            <Label>Trade license expiry *</Label>
+            <Input type="date" value={data.tradeLicenseExpiry} onChange={(e) => setData({ ...data, tradeLicenseExpiry: e.target.value })} />
+            <FieldError message={errors.tradeLicenseExpiry} />
+          </div>
+          <FileUploadField
+            label="Trade license"
+            files={data.tradeLicenseFile ? [data.tradeLicenseFile] : []}
+            onChange={(files) => setData({ ...data, tradeLicenseFile: files[0] })}
+            required
           />
+          <FieldError message={errors.tradeLicenseFile} />
+          <Input type="email" value={data.contactEmail} onChange={(e) => setData({ ...data, contactEmail: e.target.value })} placeholder="Email *" />
+          <div className="rounded-md border border-border p-4">
+            <p className="font-medium text-foreground">Supervisor</p>
+            <p className="mt-1 text-xs text-muted-foreground">Emergency entry is for the supervisor only.</p>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <div className="md:col-span-2">
+                <Label>Full name *</Label>
+                <Input value={supervisor.fullName} onChange={(e) => setSupervisor({ fullName: e.target.value })} />
+              </div>
+              <div>
+                <Label>Designation *</Label>
+                <Input value={supervisor.trade} onChange={(e) => setSupervisor({ trade: e.target.value })} />
+              </div>
+              <div>
+                <Label>Emirates ID *</Label>
+                <Input value={supervisor.emiratesId} placeholder="784-XXXX-XXXXXXX-X" onChange={(e) => setSupervisor({ emiratesId: formatEmiratesId(e.target.value) })} />
+              </div>
+              <div>
+                <Label>EID expiry *</Label>
+                <Input type="date" value={supervisor.eidExpiry} onChange={(e) => setSupervisor({ eidExpiry: e.target.value })} />
+              </div>
+              <div>
+                <Label>Mobile *</Label>
+                <Input inputMode="numeric" maxLength={10} placeholder="05XXXXXXXX" value={supervisor.mobile} onChange={(e) => setSupervisor({ mobile: e.target.value.replace(/\D/g, "").slice(0, 10) })} />
+              </div>
+              <div className="md:col-span-2">
+                <FileUploadField label="Emirates ID copy" files={supervisor.eidCopy ? [supervisor.eidCopy] : []} onChange={(files) => setSupervisor({ eidCopy: files[0] })} />
+              </div>
+            </div>
+            <FieldError message={errors["workers.0"]} />
+          </div>
         </>
       )}
       {step === 3 && (
@@ -239,8 +299,24 @@ export function PtwEmergencyForm() {
       ))}
       {step === 5 && (
         <>
-          <Checkbox checked={data.declaration} onCheckedChange={(c) => setData({ ...data, declaration: c === true })} />
-          <Input value={data.declarantName} onChange={(e) => setData({ ...data, declarantName: e.target.value })} placeholder="Name *" />
+          <p className="text-sm font-semibold text-foreground">Section IV — Undertaking and affirmation</p>
+          {SECTION_IV_UNDERTAKINGS.map((text, i) => (
+            <label key={text} className="flex gap-2 text-sm">
+              <Checkbox checked={!!data.undertakings[i]} onCheckedChange={(c) => { const u = [...data.undertakings]; u[i] = c === true; setData({ ...data, undertakings: u }); }} />
+              {i + 1}. {text}
+            </label>
+          ))}
+          <FieldError message={errors.undertakings} />
+          <div>
+            <Label>Name *</Label>
+            <Input value={data.declarantName} onChange={(e) => setData({ ...data, declarantName: e.target.value })} />
+            <FieldError message={errors.declarantName} />
+          </div>
+          <div>
+            <Label>Designation *</Label>
+            <Input value={data.declarantDesignation} onChange={(e) => setData({ ...data, declarantDesignation: e.target.value })} />
+            <FieldError message={errors.declarantDesignation} />
+          </div>
           <SignaturePadField onChange={(u) => setData({ ...data, signatureDataUrl: u })} error={errors.signature} />
           <FileUploadField
             label="Supporting files"

@@ -9,7 +9,7 @@ export const workerSchema = z.object({
     .string()
     .regex(EID_REGEX, "Use format 784-XXXX-XXXXXXX-X"),
   eidExpiry: z.string().min(1, "EID expiry is required"),
-  mobile: z.string().regex(MOBILE_REGEX, "Use 05XXXXXXXX or +9715XXXXXXXX"),
+  mobile: z.string().regex(MOBILE_REGEX, "Mobile must be 10 digits, starting with 05"),
   inductionDone: z.enum(["yes", "no"]).optional(),
   eidCopy: z
     .object({ name: z.string(), type: z.string(), base64: z.string() })

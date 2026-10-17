@@ -4,6 +4,7 @@ import { useRef } from "react";
 import SignatureCanvas from "react-signature-canvas";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { FileUploadField } from "@/components/file-upload-field";
 
 type Props = {
   onChange: (dataUrl: string | undefined) => void;
@@ -26,6 +27,19 @@ export function SignaturePadField({ onChange, error }: Props) {
           onEnd={() => {
             const url = ref.current?.toDataURL("image/png");
             onChange(url);
+          }}
+        />
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">Draw in the box, or upload a picture of the signature.</p>
+      <div className="mt-2">
+        <FileUploadField
+          label="Upload signature"
+          files={[]}
+          onChange={(files) => {
+            const file = files[0];
+            if (!file) return;
+            if (!file.type.startsWith("image/")) return;
+            onChange(`data:${file.type};base64,${file.base64}`);
           }}
         />
       </div>

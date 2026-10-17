@@ -19,7 +19,7 @@ import { CompanyPicker } from "@/components/company-picker";
 import type { CompanyMatch } from "@/app/actions/roster";
 import { WorkersEditor } from "@/components/workers-editor";
 import { workerFieldError, validateEidAfterWorkEnd, validateWorkersEidUnique, type WorkerInput } from "@/lib/validations/worker";
-import { HSE_SECTIONS } from "@/lib/hse-requirements";
+import { SECTION_IV_UNDERTAKINGS } from "@/lib/constants";
 import { addWorkingDays, dubaiToday } from "@/lib/working-days";
 import { format } from "date-fns";
 
@@ -42,6 +42,9 @@ type Draft = {
   documents: FilePayload[];
   workers: WorkerInput[];
   tradeLicenseNo: string;
+  tradeLicenseExpiry: string;
+  tradeLicenseFile?: FilePayload;
+  declarantDesignation: string;
   designation: string;
   applicantPhone: string;
   supervisorName: string;
@@ -67,6 +70,8 @@ const initial: Draft = {
   documents: [],
   workers: [{ fullName: "", trade: "", emiratesId: "", eidExpiry: "", mobile: "", inductionDone: "no" }],
   tradeLicenseNo: "",
+  tradeLicenseExpiry: "",
+  declarantDesignation: "",
   designation: "",
   applicantPhone: "",
   supervisorName: "",
@@ -104,7 +109,15 @@ export function PtwStandardForm() {
 
   function validate(s: number) {
     const e: Record<string, string> = {};
-    if (s === 1 && (!data.companyName || !data.applicantEmail)) e.companyName = "Required";
+    const today = new Date().toISOString().slice(0, 10);
+    const attending = data.workers.filter((worker) => worker.fullName.trim() || worker.emiratesId.trim());
+    if (s === 1) {
+      if (!data.companyName || !data.applicantEmail) e.companyName = "Company and email are required";
+      if (!data.tradeLicenseNo) e.tradeLicenseNo = "Trade license number is required";
+      if (!data.tradeLicenseExpiry) e.tradeLicenseExpiry = "Trade license expiry is required";
+      else if (data.tradeLicenseExpiry < today) e.tradeLicenseExpiry = "Trade license is expired. Update the trade license before anyone from this company can apply.";
+      if (!data.tradeLicenseFile) e.tradeLicenseFile = "Upload the trade license";
+    }
     if (s === 2 && data.workDescription.length < 30) e.workDescription = "Min 30 chars";
     if (s === 3) {
       if (!data.startDate || !data.endDate) e.endDate = "Required";
@@ -114,27 +127,34 @@ export function PtwStandardForm() {
     if (s === 4 && data.ppe.length === 0) e.ppe = "Select PPE";
     if (s === 4 && data.documents.length === 0) e.documents = "Attach the method statement, trade license, or IDs";
     if (s === 4) {
-      if (!data.workers.length) e.workers = "Add at least one worker";
-      data.workers.forEach((worker, index) => {
+      if (!attending.length) e.workers = "Tick at least one worker, or add a new worker";
+      attending.forEach((worker) => {
+        const index = data.workers.indexOf(worker);
         const message = workerFieldError(worker);
         if (message) e[`workers.${index}`] = message;
       });
-      if (!validateWorkersEidUnique(data.workers)) e.workers = "Duplicate Emirates ID";
-      if (data.endDate && !validateEidAfterWorkEnd(data.workers, data.endDate)) {
-        e.workers = "A worker's Emirates ID expires before the job ends";
+      if (!validateWorkersEidUnique(attending)) e.workers = "Duplicate Emirates ID";
+      if (data.endDate && !validateEidAfterWorkEnd(attending, data.endDate)) {
+        e.workers = "A worker's Emirates ID expires before the job ends. Provide an updated ID.";
       }
     }
     if (s === 5) {
-      if (!data.hseAck.A) e.hse = "Acknowledge HSE";
-      if (!data.undertakings.every(Boolean)) e.undertakings = "All undertakings";
-      if (!data.declarantName || !data.signatureDataUrl) e.declarantName = "Name and signature required";
+      if (!data.undertakings.every(Boolean)) e.undertakings = "Confirm each statement in Section IV";
+      if (!data.declarantName) e.declarantName = "Name is required";
+      if (!data.declarantDesignation) e.declarantDesignation = "Designation is required";
+      if (!data.signatureDataUrl) e.signature = "Draw or upload a signature";
     }
+    const first = Object.values(e)[0];
+    if (first) e.submit = first;
     setErrors(e);
     return Object.keys(e).length === 0;
   }
 
   async function handleSubmit() {
-    if (!validate(5)) return;
+    for (const stepNumber of [1, 2, 3, 4, 5]) {
+      if (!validate(stepNumber)) return;
+    }
+    const attending = data.workers.filter((worker) => worker.fullName.trim() || worker.emiratesId.trim());
     setSubmitting(true);
     const res = await submitForm({
       type: "ptw_standard",
@@ -144,28 +164,33 @@ export function PtwStandardForm() {
       building: data.building,
       startAt: data.startDate,
       endAt: data.endDate,
-      maxWorkers: data.workers.length,
+      maxWorkers: attending.length,
       signatureDataUrl: data.signatureDataUrl,
       documents: [
         ...data.documents,
-        ...data.workers.flatMap((worker) =>
+        ...(data.tradeLicenseFile ? [{ ...data.tradeLicenseFile, name: `Trade-license-${data.tradeLicenseFile.name}` }] : []),
+        ...attending.flatMap((worker) =>
           worker.eidCopy ? [{ ...worker.eidCopy, name: `EID-${worker.fullName}-${worker.eidCopy.name}` }] : [],
         ),
       ],
       data: {
         applicantName: data.applicantName,
         designation: data.designation,
+        declarantName: data.declarantName,
+        declarantDesignation: data.declarantDesignation,
         applicantPhone: data.applicantPhone,
         department: data.department,
         tradeLicenseNo: data.tradeLicenseNo,
+        tradeLicenseExpiry: data.tradeLicenseExpiry,
         supervisorName: data.supervisorName,
         supervisorPhone: data.supervisorPhone,
         workDescription: data.workDescription,
         floorArea: data.floorArea,
         ppe: data.ppe,
+        undertakings: SECTION_IV_UNDERTAKINGS.filter((_, index) => data.undertakings[index]),
         submittedAt: new Date().toISOString(),
       },
-      workers: data.workers.map((worker) => ({
+      workers: attending.map((worker) => ({
         fullName: worker.fullName,
         trade: worker.trade,
         emiratesId: worker.emiratesId,
@@ -192,16 +217,14 @@ export function PtwStandardForm() {
       department: company.department || data.department,
       supervisorName: company.supervisorName || data.supervisorName,
       building: company.building || data.building,
-      workers: company.workers.length
-        ? company.workers.map((worker) => ({
+      workers: company.workers.filter((worker) => !worker.expired).map((worker) => ({
             fullName: worker.fullName,
             trade: worker.trade,
             emiratesId: worker.emiratesId,
             eidExpiry: worker.eidExpiry,
-            mobile: worker.mobile,
+            mobile: worker.mobile.replace(/\D/g, "").slice(0, 10),
             inductionDone: "no" as const,
-          }))
-        : data.workers,
+          })),
     });
   }
 
@@ -211,7 +234,20 @@ export function PtwStandardForm() {
       {step === 1 && (
         <div className="grid gap-3">
           <Input value={data.companyName} onChange={(e) => setData({ ...data, companyName: e.target.value })} placeholder="Company *" />
-          <Input value={data.tradeLicenseNo} onChange={(e) => setData({ ...data, tradeLicenseNo: e.target.value })} placeholder="Trade license no." />
+          <Input value={data.tradeLicenseNo} onChange={(e) => setData({ ...data, tradeLicenseNo: e.target.value })} placeholder="Trade license no. *" />
+          <FieldError message={errors.tradeLicenseNo} />
+          <div>
+            <Label>Trade license expiry *</Label>
+            <Input type="date" value={data.tradeLicenseExpiry} onChange={(e) => setData({ ...data, tradeLicenseExpiry: e.target.value })} />
+            <FieldError message={errors.tradeLicenseExpiry} />
+          </div>
+          <FileUploadField
+            label="Trade license"
+            files={data.tradeLicenseFile ? [data.tradeLicenseFile] : []}
+            onChange={(files) => setData({ ...data, tradeLicenseFile: files[0] })}
+            required
+          />
+          <FieldError message={errors.tradeLicenseFile} />
           <Input value={data.applicantName} onChange={(e) => setData({ ...data, applicantName: e.target.value })} placeholder="Applicant name *" />
           <Input value={data.designation} onChange={(e) => setData({ ...data, designation: e.target.value })} placeholder="Designation" />
           <Input type="email" value={data.applicantEmail} onChange={(e) => setData({ ...data, applicantEmail: e.target.value })} placeholder="Email *" />
@@ -253,13 +289,26 @@ export function PtwStandardForm() {
       )}
       {step === 5 && (
         <>
-          <div className="rounded border p-3 text-xs">{HSE_SECTIONS[0].title}: <Checkbox checked={!!data.hseAck.A} onCheckedChange={(c) => setData({ ...data, hseAck: { A: c === true } })} /> I comply</div>
-          {data.undertakings.map((_, i) => (
-            <label key={i} className="flex gap-2 text-sm"><Checkbox checked={data.undertakings[i]} onCheckedChange={(c) => { const u = [...data.undertakings]; u[i] = c === true; setData({ ...data, undertakings: u }); }} />Undertaking {i + 1}</label>
+          <p className="text-sm font-semibold text-foreground">Section IV — Undertaking and affirmation</p>
+          {SECTION_IV_UNDERTAKINGS.map((text, i) => (
+            <label key={text} className="flex gap-2 text-sm">
+              <Checkbox checked={data.undertakings[i]} onCheckedChange={(c) => { const u = [...data.undertakings]; u[i] = c === true; setData({ ...data, undertakings: u }); }} />
+              {i + 1}. {text}
+            </label>
           ))}
-          <Input value={data.declarantName} onChange={(e) => setData({ ...data, declarantName: e.target.value })} />
-          <SignaturePadField onChange={(u) => setData({ ...data, signatureDataUrl: u })} />
-          <p className="text-sm text-muted-foreground">{format(new Date(), "dd MMM yyyy")}</p>
+          <FieldError message={errors.undertakings} />
+          <div>
+            <Label>Name *</Label>
+            <Input value={data.declarantName} onChange={(e) => setData({ ...data, declarantName: e.target.value })} />
+            <FieldError message={errors.declarantName} />
+          </div>
+          <div>
+            <Label>Designation *</Label>
+            <Input value={data.declarantDesignation} onChange={(e) => setData({ ...data, declarantDesignation: e.target.value })} />
+            <FieldError message={errors.declarantDesignation} />
+          </div>
+          <SignaturePadField error={errors.signature} onChange={(u) => setData({ ...data, signatureDataUrl: u })} />
+          <p className="text-sm text-muted-foreground">Date: {format(new Date(), "dd MMM yyyy")}</p>
           <FieldError message={errors.submit} />
         </>
       )}

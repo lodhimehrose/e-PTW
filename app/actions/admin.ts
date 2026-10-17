@@ -6,7 +6,22 @@ import { revalidatePath } from "next/cache";
 import { renderSubmissionPdf } from "@/lib/pdf/render";
 import { uploadBuffer } from "@/lib/storage";
 import { formDisplayName, sendEmail } from "@/lib/email/send";
+import { APPROVAL_CONTACTS } from "@/lib/constants";
 import QRCode from "qrcode";
+
+function uniqueAddresses(values: Array<string | null | undefined>) {
+  const seen = new Set<string>();
+  const emails: string[] = [];
+  for (const value of values) {
+    const email = value?.trim();
+    if (!email || !email.includes("@")) continue;
+    const key = email.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    emails.push(email);
+  }
+  return emails;
+}
 
 export type Decision = "approved" | "approved_with_conditions" | "rejected";
 
@@ -65,32 +80,39 @@ export async function decideSubmission(
     approvedPdfPath = `${id}/approved.pdf`;
     await uploadBuffer(approvedPdfPath, pdfBuf, "application/pdf");
 
-    const recipients: string[] = [sub.contact_email].filter(Boolean);
-    const extra =
+    const configured =
       sub.type === "gate_pass"
         ? settings?.gate_pass_recipients
         : sub.type === "ptw_emergency"
           ? settings?.ptw_emergency_recipients
           : settings?.ptw_standard_recipients;
-    if (extra) {
-      recipients.push(
-        ...extra.split(",").map((e: string) => e.trim()).filter(Boolean),
-      );
-    }
+    const recipients = uniqueAddresses([
+      sub.contact_email,
+      ...APPROVAL_CONTACTS,
+      ...(configured ? String(configured).split(",") : []),
+    ]);
 
     await sendEmail({
       to: recipients,
       subject: `Approved – ${formDisplayName(sub.type)} ${sub.ref_no}`,
-      html: `<p>Your permit <strong>${sub.ref_no}</strong> has been approved.</p>
+      html: `<p><strong>${sub.company_name}</strong> — ${formDisplayName(sub.type)} <strong>${sub.ref_no}</strong> is approved.</p>
+        <p>Status: ${status.replace(/_/g, " ")}</p>
         ${note ? `<p>Conditions: ${note}</p>` : ""}
+        <p>The matching gate pass is approved with this permit.</p>
         <p><a href="${verifyUrl}">Verify permit</a></p>`,
       attachments: [{ filename: `${sub.ref_no}-approved.pdf`, content: pdfBuf }],
     });
   } else {
+    const recipients = uniqueAddresses([
+      sub.contact_email,
+      ...APPROVAL_CONTACTS,
+      ...(settings?.ptw_standard_recipients ? String(settings.ptw_standard_recipients).split(",") : []),
+    ]);
     await sendEmail({
-      to: sub.contact_email,
+      to: recipients,
       subject: `Not approved – ${sub.ref_no}`,
-      html: `<p>Your submission was not approved.</p><p><strong>Reason:</strong> ${note}</p>
+      html: `<p><strong>${sub.company_name}</strong> — ${formDisplayName(sub.type)} <strong>${sub.ref_no}</strong> was not approved.</p>
+        <p><strong>Reason:</strong> ${note}</p>
         <p><a href="${site}">Submit again</a></p>`,
     });
   }

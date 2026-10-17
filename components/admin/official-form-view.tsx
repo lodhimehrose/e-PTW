@@ -109,6 +109,7 @@ export function OfficialFormView({
       <div className="grid sm:grid-cols-2">
         <Cell label="Company name" value={companyName} />
         <Cell label="Trade license no." value={data.tradeLicenseNo} />
+        <Cell label="Trade license expiry" value={data.tradeLicenseExpiry} />
         <Cell label={emergency ? "Reported by" : "Applicant"} value={data.applicantName || data.reportedBy} />
         <Cell label="Designation" value={data.designation} />
         <Cell label="Email" value={contactEmail} />
@@ -133,7 +134,7 @@ export function OfficialFormView({
       </div>
 
       <h3 className="bg-[#13294B] px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">
-        {gate ? "Section II — Workforce" : "Section III — Workforce details"}
+        {emergency ? "Supervisor" : gate ? "Section II — Workforce" : "Section III — Workforce details"}
       </h3>
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-xs">
@@ -184,9 +185,8 @@ export function OfficialFormView({
         Declaration
       </h3>
       <div className="grid gap-2 p-3 text-sm sm:grid-cols-[1fr_160px]">
-        <p>
-          I confirm that the information on this {gate ? "gate pass" : "permit"} is true, that listed workers hold a valid Emirates ID, and that the work will follow the SMA permit conditions.
-        </p>
+        <Cell label="Name" value={data.declarantName} />
+        <Cell label="Designation" value={data.declarantDesignation || data.designation} />
         {signatureUrl ? (
           <img src={signatureUrl} alt="Signature" className="h-16 w-40 border border-slate-300 object-contain" />
         ) : (

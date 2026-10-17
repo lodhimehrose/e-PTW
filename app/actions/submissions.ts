@@ -107,6 +107,26 @@ export async function submitForm(payload: SubmitPayload) {
     return { ok: false as const, error: "Too many requests. Try again shortly." };
   }
 
+  const today = new Date().toISOString().slice(0, 10);
+  const licenseNo = String(payload.data.tradeLicenseNo ?? "").trim();
+  const licenseExpiry = String(payload.data.tradeLicenseExpiry ?? "");
+  if (payload.type !== "gate_pass") {
+    if (!licenseNo) return { ok: false as const, error: "Trade license number is required." };
+    if (licenseExpiry && licenseExpiry < today) {
+      return {
+        ok: false as const,
+        error: "Trade license is expired. Update the trade license before anyone from this company can apply.",
+      };
+    }
+  }
+  const expiredWorker = payload.workers?.find((worker) => worker.eidExpiry && worker.eidExpiry < today);
+  if (expiredWorker) {
+    return {
+      ok: false as const,
+      error: `${expiredWorker.fullName}'s Emirates ID is expired. Provide an updated ID. This person cannot be included on the permit.`,
+    };
+  }
+
   const supabase = createServiceClient();
   let ownerId: string | null = null;
   try {
