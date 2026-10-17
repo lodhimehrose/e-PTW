@@ -41,6 +41,7 @@ export default async function TrackPage({ params }: { params: { ref: string } })
             <h2 className="mt-1 text-2xl font-bold text-foreground">{data.ref_no}</h2>
           </div>
           <StatusBadge status={data.status} urgent={data.type === "ptw_emergency"} />
+          <a href={`/api/pdf/${data.ref_no}`} className="text-sm underline">Download PDF</a>
         </div>
         <p className="mt-4 text-sm text-muted-foreground">{statusNote(data.status)}</p>
         {data.decision_note && (

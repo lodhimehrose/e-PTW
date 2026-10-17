@@ -4,6 +4,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { SubmissionActions } from "@/components/admin/submission-actions";
 import { EditSubmissionForm, IssueGatePassForm } from "@/components/admin/submission-tools";
 import { getSignedUrl } from "@/lib/storage";
+import { GatePassEditor } from "@/components/admin/gate-pass-editor";
 import { OfficialFormView } from "@/components/admin/official-form-view";
 
 function labelize(key: string) {
@@ -24,8 +25,10 @@ const hiddenKeys = new Set([
 
 export default async function SubmissionDetailPage({
   params,
+  searchParams,
 }: {
   params: { id: string };
+  searchParams: { tab?: string };
 }) {
   const supabase = createServiceClient();
   const { data: sub } = await supabase
@@ -78,6 +81,22 @@ export default async function SubmissionDetailPage({
     }
   }
 
+  const { data: linkedGate } = sub.type === "gate_pass"
+    ? { data: null }
+    : await supabase
+        .from("submissions")
+        .select("*, workers(*), vehicles(*), tools(*), gate_logs(*)")
+        .eq("linked_ref_no", sub.ref_no)
+        .eq("type", "gate_pass")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+  const tab = searchParams.tab || "permit";
+  const gate = linkedGate;
+  const shown = tab === "gate" && gate ? gate : sub;
+  const shownData = (shown.data ?? {}) as Record<string, unknown>;
+
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -91,11 +110,25 @@ export default async function SubmissionDetailPage({
             <StatusBadge status={sub.status} urgent={sub.type === "ptw_emergency"} />
           </div>
         </div>
-        <Link href="/admin/submissions" className="text-sm underline">
-          Back to list
-        </Link>
+        <div className="flex gap-2">
+          <a href={`/api/pdf/${sub.ref_no}`} className="text-sm underline">Download PDF</a>
+          <Link href="/admin/submissions" className="text-sm underline">Back to list</Link>
+        </div>
       </div>
+      <nav className="flex flex-wrap gap-2 text-sm">
+        {[
+          ["permit", "Permit"],
+          ["gate", "Gate Pass"],
+          ["documents", "Documents"],
+          ["history", "History"],
+        ].map(([key, label]) => (
+          <Link key={key} href={`/admin/submissions/${sub.id}?tab=${key}`} className="rounded-full border border-border px-3 py-1">
+            {label}
+          </Link>
+        ))}
+      </nav>
 
+      {tab === "permit" && (
       <OfficialFormView
         type={sub.type}
         refNo={sub.ref_no}
@@ -109,9 +142,44 @@ export default async function SubmissionDetailPage({
         workers={sub.workers ?? []}
         vehicles={sub.vehicles ?? []}
         tools={sub.tools ?? []}
+        gateLogs={sub.gate_logs ?? []}
         signatureUrl={signatureUrl}
+        documents={documents}
       />
+      )}
 
+      {tab === "gate" && gate && (
+        <div className="space-y-4">
+          <OfficialFormView
+            type={gate.type}
+            refNo={gate.ref_no}
+            status={gate.status}
+            companyName={gate.company_name ?? ""}
+            contactEmail={gate.contact_email ?? ""}
+            building={gate.building ?? ""}
+            startAt={gate.start_at}
+            endAt={gate.end_at}
+            data={shownData}
+            workers={gate.workers ?? []}
+            vehicles={gate.vehicles ?? []}
+            tools={gate.tools ?? []}
+            gateLogs={gate.gate_logs ?? []}
+            documents={documents}
+          />
+          {["draft", "pending"].includes(gate.status) && (
+            <GatePassEditor
+              id={gate.id}
+              purpose={String(shownData.purpose || "")}
+              building={gate.building ?? ""}
+              maxWorkers={gate.max_workers ?? (gate.workers ?? []).length}
+              workers={gate.workers ?? []}
+            />
+          )}
+        </div>
+      )}
+      {tab === "gate" && !gate && <p className="text-sm text-muted-foreground">No gate pass has been created for this record yet.</p>}
+
+      {tab === "documents" && (
       <section className="rounded-2xl border border-border bg-card p-5">
         <h2 className="font-semibold text-foreground">Documents</h2>
         {pdfLink && (
@@ -140,6 +208,7 @@ export default async function SubmissionDetailPage({
           ))}
         </ul>
       </section>
+      )}
 
       <SubmissionActions id={sub.id} type={sub.type} />
 
@@ -160,6 +229,7 @@ export default async function SubmissionDetailPage({
         />
       )}
 
+      {tab === "history" && (
       <div>
         <h3 className="font-medium">Audit log</h3>
         <ul className="text-xs text-muted-foreground">
@@ -170,6 +240,7 @@ export default async function SubmissionDetailPage({
           ))}
         </ul>
       </div>
+      )}
     </div>
   );
 }

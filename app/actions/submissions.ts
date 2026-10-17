@@ -161,6 +161,7 @@ export async function submitForm(payload: SubmitPayload) {
   delete storedData.honeypot;
   delete storedData.workers;
 
+  const verifyToken = randomUUID();
   const { data: row, error } = await supabase
     .from("submissions")
     .insert({
@@ -176,7 +177,7 @@ export async function submitForm(payload: SubmitPayload) {
       linked_ref_no: payload.linkedRefNo ?? null,
       owner_id: ownerId,
       data: storedData,
-      verify_token: randomUUID(),
+      verify_token: verifyToken,
     })
     .select("id, ref_no")
     .single();
@@ -269,36 +270,49 @@ export async function submitForm(payload: SubmitPayload) {
   let gateRef = "";
   if (payload.type === "ptw_standard" || payload.type === "ptw_emergency") {
     const { data: gateNo } = await supabase.rpc("next_ref_no", { p_type: "gate_pass" });
+    const endDay = (payload.endAt || "").slice(0, 10);
+    const eligible = (workers ?? []).filter((worker) => !endDay || String(worker.eid_expiry).slice(0, 10) >= endDay);
     if (gateNo) {
-      const { data: gate } = await supabase
-        .from("submissions")
-        .insert({
-          type: "gate_pass",
-          ref_no: gateNo,
-          status: "pending",
-          company_name: payload.companyName,
-          contact_email: payload.contactEmail,
-          building: payload.building ?? null,
-          start_at: payload.startAt ?? null,
-          end_at: payload.endAt ?? null,
-          max_workers: payload.workers?.length ?? payload.maxWorkers ?? null,
-          linked_ref_no: refNo,
-          owner_id: ownerId,
-          data: {
-            autoCreated: true,
-            sourcePermit: refNo,
-            form: payload.type === "ptw_emergency" ? "Form-08A" : "Form-08",
-            purpose: String(storedData.workDescription || storedData.workScope || storedData.purpose || ""),
-          },
-          verify_token: randomUUID(),
-        })
-        .select("id")
-        .single();
-      if (gate?.id) {
-        if (workers?.length) {
+      const gateData = {
+        autoCreated: true,
+        sourcePermit: refNo,
+        form: payload.type === "ptw_emergency" ? "Form-08A" : "Form-08",
+        permitType: payload.type === "ptw_emergency" ? "Emergency" : "Standard",
+        purpose: String(storedData.workDescription || storedData.workScope || storedData.description || ""),
+        tradeLicenseNo: storedData.tradeLicenseNo,
+        tradeLicenseExpiry: storedData.tradeLicenseExpiry,
+        supervisorName: storedData.supervisorName || storedData.reportedBy,
+        supervisorPhone: storedData.supervisorPhone,
+        department: storedData.department,
+        declarantName: storedData.declarantName,
+        entryFrom: payload.startAt,
+        entryTo: payload.endAt,
+        workerCount: eligible.length,
+        maxWorkers: payload.maxWorkers ?? eligible.length,
+      };
+      const base = {
+        type: "gate_pass" as const,
+        ref_no: gateNo,
+        company_name: payload.companyName,
+        contact_email: payload.contactEmail,
+        building: payload.building ?? null,
+        start_at: payload.startAt ?? null,
+        end_at: payload.endAt ?? null,
+        max_workers: payload.maxWorkers ?? eligible.length,
+        linked_ref_no: refNo,
+        owner_id: ownerId,
+        data: gateData,
+        verify_token: randomUUID(),
+      };
+      let gate = await supabase.from("submissions").insert({ ...base, status: "draft" }).select("id").single();
+      if (gate.error) {
+        gate = await supabase.from("submissions").insert({ ...base, status: "pending" }).select("id").single();
+      }
+      if (gate.data?.id) {
+        if (eligible.length) {
           await supabase.from("workers").insert(
-            workers.map((worker) => ({
-              submission_id: gate.id,
+            eligible.map((worker) => ({
+              submission_id: gate.data.id,
               full_name: worker.full_name,
               trade: worker.trade,
               emirates_id: worker.emirates_id,
@@ -325,7 +339,7 @@ export async function submitForm(payload: SubmitPayload) {
     subject: `${urgent}We received your ${formName} – Ref ${refNo}`,
     html: `<p>Thank you. Your submission <strong>${refNo}</strong> is <strong>Pending</strong> review.</p>
       ${gateLine}
-      <p><a href="${site}/portal/status">Track this application by email</a></p>`,
+      <p><a href="${site}/api/pdf/${refNo}?token=${verifyToken}">Download the form PDF</a></p>`,
   });
 
   const { data: settings } = await supabase
@@ -344,13 +358,13 @@ export async function submitForm(payload: SubmitPayload) {
     process.env.ADMIN_EMAIL,
     ...splitEmails(configured),
   ]);
-  for (const to of receivers) {
+  if (receivers.length) {
     await sendEmail({
-      to,
+      to: receivers,
       subject: `${urgent}New ${formName} – ${payload.companyName} – ${refNo}`,
       html: `<p><strong>${payload.companyName}</strong> submitted a ${formName}.</p>
         <p>Reference: <strong>${refNo}</strong></p>
-        ${gateRef ? `<p>Gate pass: <strong>${gateRef}</strong></p>` : ""}
+        ${gateRef ? `<p>Gate pass: <strong>${gateRef}</strong> (draft, editable before approval)</p>` : ""}
         <p>Contact: ${payload.contactEmail}</p>
         <p>Location: ${payload.building ?? "—"}</p>
         <p>Workers: ${workers?.length ?? 0}</p>

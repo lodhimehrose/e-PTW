@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
 const styles: Record<string, string> = {
-  pending: "bg-amber-100 text-amber-900",
+  draft: "bg-slate-200 text-slate-800",
   approved: "bg-green-100 text-green-900",
   approved_with_conditions: "bg-green-100 text-green-800",
   rejected: "bg-red-100 text-red-900",

@@ -113,6 +113,7 @@ export default async function SubmissionsPage({
                   <Link href={`/admin/submissions/${s.id}`} className="underline">
                     Open
                   </Link>
+                  <a href={`/api/pdf/${s.ref_no}`} className="ml-2 text-xs underline">PDF</a>
                 </td>
               </tr>
             ))}

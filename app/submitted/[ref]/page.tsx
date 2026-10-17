@@ -18,7 +18,7 @@ export default function SubmittedPage({
           <p className="text-sm text-muted-foreground">
             EHS has the application at ehs@sma.ac.ae. The gate pass uses the same company and worker details and is approved with this permit.
           </p>
-          <Button asChild variant="outline"><Link href="/portal">Open my portal</Link></Button>
+          <Button asChild variant="outline"><Link href={`/portal/track/${ref}`}>Download the PDF</Link></Button>
         </CardContent>
       </Card>
     </SiteShell>

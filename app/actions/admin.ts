@@ -363,3 +363,35 @@ export async function issueGatePass(
   revalidatePath("/admin/submissions");
   return { ok: true as const, id: row.id as string, refNo: row.ref_no as string };
 }
+
+export async function saveGatePass(
+  id: string,
+  input: { purpose: string; building: string; workers: { id: string; fullName: string; trade: string; mobile: string }[] },
+) {
+  const { user } = await requireAdmin();
+  const supabase = createServiceClient();
+  const { data: current } = await supabase.from("submissions").select("data, status").eq("id", id).single();
+  if (!current) return { ok: false as const, error: "Not found" };
+  if (!["draft", "pending"].includes(current.status)) {
+    return { ok: false as const, error: "This gate pass is locked after approval. Use Amend to open a new revision." };
+  }
+  await supabase
+    .from("submissions")
+    .update({
+      building: input.building,
+      data: { ...((current.data as Record<string, unknown>) ?? {}), purpose: input.purpose },
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+  for (const worker of input.workers) {
+    await supabase.from("workers").update({ full_name: worker.fullName, trade: worker.trade, mobile: worker.mobile }).eq("id", worker.id);
+  }
+  await supabase.from("audit_log").insert({
+    submission_id: id,
+    action: "gate_pass_edited",
+    note: "Company purpose, location, or workers updated before approval",
+    actor: user.email,
+  });
+  revalidatePath("/admin/submissions");
+  return { ok: true as const };
+}

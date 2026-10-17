@@ -268,7 +268,7 @@ export function PtwStandardForm() {
       )}
       {step === 4 && (
         <>
-          {["Fire extinguishers", "Helmet & shoes", "Safety vest"].map((p) => (
+          {["Fire extinguishers", "Safety helmet & safety shoes", "Safety vest"].map((p) => (
             <label key={p} className="flex gap-2 text-sm"><Checkbox checked={data.ppe.includes(p)} onCheckedChange={(c) => setData({ ...data, ppe: c ? [...data.ppe, p] : data.ppe.filter((x) => x !== p) })} />{p}</label>
           ))}
           <FileUploadField

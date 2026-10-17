@@ -1,41 +1,24 @@
-import { FORM_REFS } from "@/lib/constants";
+import { formFor } from "@/lib/forms";
+import { selectedKeys, statementsFrom, type FormField } from "@/lib/forms/shared";
+import { FORM_07_UNDERTAKINGS } from "@/lib/forms/form-07";
 
-type Worker = {
-  id?: string;
-  full_name: string;
-  trade: string;
-  emirates_id: string;
-  eid_expiry: string;
-  mobile?: string;
-};
-
-type Vehicle = {
-  id: string;
-  vehicle_type: string | null;
-  plate_no: string | null;
-  driver_name: string | null;
-};
-
-type Tool = {
-  id: string;
-  description: string | null;
-  quantity: string | null;
-  serial_id: string | null;
-};
+type Worker = { id?: string; full_name: string; trade: string; emirates_id: string; eid_expiry: string; mobile?: string };
+type Vehicle = { id: string; vehicle_type: string | null; plate_no: string | null; driver_name: string | null };
+type Tool = { id: string; description: string | null; quantity: string | null; serial_id: string | null };
+type GateLog = { id: string; logged_on?: string; direction?: string; note?: string; created_at?: string };
 
 function text(value: unknown) {
-  if (value == null || value === "") return "—";
-  if (Array.isArray(value)) return value.join(", ");
+  if (value == null || value === "") return "";
+  if (Array.isArray(value)) return value.map((item) => (typeof item === "object" ? "" : String(item))).filter(Boolean).join(", ");
   if (typeof value === "boolean") return value ? "Yes" : "No";
   return String(value);
 }
 
-function Cell({ label, value }: { label: string; value: unknown }) {
+function Box({ on }: { on: boolean }) {
   return (
-    <div className="border border-slate-400 p-2">
-      <p className="text-[10px] uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1 text-sm font-medium text-slate-900">{text(value)}</p>
-    </div>
+    <span className="mr-1 inline-flex h-3.5 w-3.5 items-center justify-center border border-slate-700 text-[9px] font-bold leading-none text-slate-900">
+      {on ? "X" : ""}
+    </span>
   );
 }
 
@@ -50,9 +33,11 @@ export function OfficialFormView({
   endAt,
   data,
   workers,
-  vehicles,
-  tools,
+  vehicles = [],
+  tools = [],
+  gateLogs = [],
   signatureUrl,
+  documents = [],
 }: {
   type: string;
   refNo: string;
@@ -64,135 +49,197 @@ export function OfficialFormView({
   endAt: string | null;
   data: Record<string, unknown>;
   workers: Worker[];
-  vehicles: Vehicle[];
-  tools: Tool[];
+  vehicles?: Vehicle[];
+  tools?: Tool[];
+  gateLogs?: GateLog[];
   signatureUrl?: string | null;
+  documents?: { file_name: string | null; href: string | null }[];
 }) {
-  const emergency = type === "ptw_emergency";
-  const gate = type === "gate_pass";
-  const title = gate
-    ? data.form === "Form-08A"
-      ? "Contractor Emergency Gate Pass"
-      : "Contractor Gate Pass"
-    : emergency
-      ? "Emergency / Breakdown Permit to Work"
-      : "Standard Permit to Work";
-  const formRef = gate
-    ? data.form === "Form-08A"
-      ? "EHSQ/SMA/2026/GP/Form-08A Rev.00"
-      : FORM_REFS.gate_pass
-    : emergency
-      ? FORM_REFS.ptw_emergency
-      : FORM_REFS.ptw_standard;
+  const form = formFor(type, data);
+  const values: Record<string, unknown> = {
+    ...data,
+    companyName: companyName || data.companyName,
+    building: building || data.building,
+    applicantEmail: data.applicantEmail || contactEmail,
+    contactEmail,
+    startDate: data.startDate || startAt,
+    endDate: data.endDate || endAt,
+    entryFrom: data.entryFrom || startAt,
+    entryTo: data.entryTo || endAt,
+    maxWorkers: data.maxWorkers || workers.length,
+    workerCount: workers.length,
+    permitType: String(data.form || "").includes("08A") || type === "ptw_emergency" ? "Emergency" : "Standard",
+  };
+  const statements = statementsFrom(data.undertakings, FORM_07_UNDERTAKINGS);
+
+  function fieldValue(field: FormField) {
+    return values[field.key];
+  }
 
   return (
-    <article className="overflow-hidden rounded-sm border border-slate-500 bg-white text-slate-900 shadow-md">
-      <header className="grid grid-cols-[88px_1fr_180px] items-center gap-3 border-b border-slate-500 p-4">
-        <img src="/sma-logo.jpg" alt="Sharjah Maritime Academy" className="h-20 w-20 rounded-full object-cover" />
-        <div className="text-center">
-          <p className="text-xs font-semibold tracking-[0.18em] text-[#13294B]">SHARJAH MARITIME ACADEMY</p>
-          <h2 className="mt-1 text-lg font-bold uppercase text-[#13294B]">{title}</h2>
-          <p className="text-[11px] text-slate-600">{formRef}</p>
-        </div>
-        <div className="text-right text-xs">
-          <p className="italic text-slate-500">For official use only</p>
-          <p className="mt-1 font-semibold">{gate ? "Gate Pass No." : "Permit No."}</p>
-          <p className="text-sm font-bold text-[#13294B]">{refNo}</p>
-          <p className="mt-1 capitalize">{status.replace(/_/g, " ")}</p>
-        </div>
-      </header>
-      <div className="h-1 bg-[#B8963E]" />
-
-      <h3 className="bg-[#13294B] px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">
-        {gate ? "Section I — Company information" : emergency ? "Section I — Emergency details" : "Section I — Applicant information"}
-      </h3>
-      <div className="grid sm:grid-cols-2">
-        <Cell label="Company name" value={companyName} />
-        <Cell label="Trade license no." value={data.tradeLicenseNo} />
-        <Cell label="Trade license expiry" value={data.tradeLicenseExpiry} />
-        <Cell label={emergency ? "Reported by" : "Applicant"} value={data.applicantName || data.reportedBy} />
-        <Cell label="Designation" value={data.designation} />
-        <Cell label="Email" value={contactEmail} />
-        <Cell label="Contact no." value={data.applicantPhone} />
-        <Cell label="Site supervisor" value={data.supervisorName} />
-        <Cell label="Supervisor contact" value={data.supervisorPhone} />
-        <Cell label="SMA requesting department" value={data.department} />
-        <Cell label="Building / location" value={building || data.floorArea} />
-      </div>
-
-      <h3 className="bg-[#13294B] px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">
-        {gate ? "Purpose and entry" : emergency ? "Section II — Work scope" : "Section II — Work application"}
-      </h3>
-      <div className="grid sm:grid-cols-2">
-        <Cell label="From" value={startAt} />
-        <Cell label="To" value={endAt} />
-        <Cell label={emergency ? "Work to be done" : "Scope of work"} value={data.workDescription || data.workScope || data.purpose} />
-        <Cell label="PPE" value={data.ppe} />
-        {emergency && <Cell label="Immediate risk" value={data.risks} />}
-        {emergency && <Cell label="Safety controls" value={data.safetyControls} />}
-        {gate && <Cell label="Linked permit" value={data.sourcePermit} />}
-      </div>
-
-      <h3 className="bg-[#13294B] px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">
-        {emergency ? "Supervisor" : gate ? "Section II — Workforce" : "Section III — Workforce details"}
-      </h3>
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-xs">
-          <thead className="bg-slate-100 text-left">
-            <tr>
-              {["S/N", "Full name", "Trade", "Emirates ID", "EID expiry", "Mobile"].map((heading) => (
-                <th key={heading} className="border border-slate-400 px-2 py-1">{heading}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {workers.length === 0 && (
-              <tr>
-                <td colSpan={6} className="border border-slate-400 px-2 py-2 text-slate-500">No workers listed</td>
-              </tr>
-            )}
-            {workers.map((worker, index) => (
-              <tr key={worker.id || worker.emirates_id}>
-                <td className="border border-slate-400 px-2 py-1">{index + 1}</td>
-                <td className="border border-slate-400 px-2 py-1">{worker.full_name}</td>
-                <td className="border border-slate-400 px-2 py-1">{worker.trade}</td>
-                <td className="border border-slate-400 px-2 py-1">{worker.emirates_id}</td>
-                <td className="border border-slate-400 px-2 py-1">{String(worker.eid_expiry).slice(0, 10)}</td>
-                <td className="border border-slate-400 px-2 py-1">{worker.mobile || "—"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {(vehicles.length > 0 || tools.length > 0) && (
-        <>
-          <h3 className="bg-[#13294B] px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">
-            Vehicles, tools and materials
-          </h3>
-          <div className="grid sm:grid-cols-2">
-            {vehicles.map((vehicle) => (
-              <Cell key={vehicle.id} label="Vehicle" value={`${vehicle.vehicle_type || "Vehicle"} · ${vehicle.plate_no || "no plate"} · ${vehicle.driver_name || ""}`} />
-            ))}
-            {tools.map((tool) => (
-              <Cell key={tool.id} label="Tool" value={`${tool.description || "Item"} · qty ${tool.quantity || "—"} · ${tool.serial_id || ""}`} />
-            ))}
+    <article className="official-form max-w-full overflow-x-auto bg-white text-slate-900" style={{ colorScheme: "light" }}>
+      <div className="min-w-[760px] border border-[#808080] bg-white">
+        <header className="grid grid-cols-[110px_1fr_210px] items-center gap-3 border-b border-[#808080] p-3">
+          <img src="/sma-logo.jpg" alt="Sharjah Maritime Academy" className="h-20 w-auto object-contain" />
+          <div>
+            <p className="text-[11px] font-bold tracking-[0.14em] text-[#13294B]">SHARJAH MARITIME ACADEMY</p>
+            <h2 className="text-lg font-bold text-[#13294B]">{form.title}</h2>
           </div>
-        </>
-      )}
+          <div className="text-right text-[11px] italic text-slate-700">
+            <p>{form.reference}</p>
+            <p>For Official Use Only</p>
+            <p className="mt-1 not-italic font-bold text-slate-900">{form.numberLabel} {refNo}</p>
+            <p className="not-italic capitalize">{status.replace(/_/g, " ")}</p>
+          </div>
+        </header>
+        <div className="h-1 bg-[#B8963E]" />
+        <div className="bg-[#F5F5F5] px-3 py-2 text-[11px] leading-5 text-slate-700">
+          {form.instructions.map((line) => <p key={line}>{line}</p>)}
+        </div>
 
-      <h3 className="bg-[#13294B] px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">
-        Declaration
-      </h3>
-      <div className="grid gap-2 p-3 text-sm sm:grid-cols-[1fr_160px]">
-        <Cell label="Name" value={data.declarantName} />
-        <Cell label="Designation" value={data.declarantDesignation || data.designation} />
-        {signatureUrl ? (
-          <img src={signatureUrl} alt="Signature" className="h-16 w-40 border border-slate-300 object-contain" />
-        ) : (
-          <p className="text-xs text-slate-500">Signature on file</p>
+        {form.sections.map((section) => (
+          <section key={section.id}>
+            <div className="grid grid-cols-[120px_1fr] bg-[#13294B] text-white">
+              <p className="px-2 py-1 text-[11px] font-bold">{section.code}</p>
+              <p className="px-2 py-1 text-[11px] font-bold">{section.title}</p>
+            </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(24, minmax(0, 1fr))" }}>
+              {section.fields.map((field) => {
+                if (field.type === "table" && (field.key === "workers" || field.key === "supervisor")) {
+                  return (
+                    <div key={field.key} className="overflow-x-auto" style={{ gridColumn: "1 / -1" }}>
+                      <table className="w-full border-collapse text-[11px]">
+                        <thead>
+                          <tr className="bg-[#F5F5F5] text-left text-slate-700">
+                            {["S/N", "Full name", "Designation / Trade", "Emirates ID No.", "EID expiry", "Mobile", "EID copy"].map((heading) => (
+                              <th key={heading} className="border border-[#808080] px-1 py-1 font-bold">{heading}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {workers.map((worker, index) => {
+                            const file = documents.find((doc) => (doc.file_name || "").toLowerCase().includes(worker.full_name.toLowerCase().slice(0, 8)));
+                            return (
+                              <tr key={worker.id || worker.emirates_id}>
+                                <td className="border border-[#808080] px-1 py-1">{index + 1}</td>
+                                <td className="border border-[#808080] px-1 py-1">{worker.full_name}</td>
+                                <td className="border border-[#808080] px-1 py-1">{worker.trade}</td>
+                                <td className="border border-[#808080] px-1 py-1">{worker.emirates_id}</td>
+                                <td className="border border-[#808080] px-1 py-1">{String(worker.eid_expiry).slice(0, 10)}</td>
+                                <td className="border border-[#808080] px-1 py-1">{worker.mobile}</td>
+                                <td className="border border-[#808080] px-1 py-1">{file?.href ? <a className="underline" href={file.href}>View</a> : "—"}</td>
+                              </tr>
+                            );
+                          })}
+                          {!workers.length && <tr><td className="border border-[#808080] px-1 py-1 text-slate-700" colSpan={7}>None listed</td></tr>}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                }
+                if (field.type === "table" && field.key === "vehicles") {
+                  return <SimpleTable key={field.key} headers={["Vehicle", "Plate", "Driver"]} rows={vehicles.map((item) => [item.vehicle_type || "", item.plate_no || "", item.driver_name || ""])} />;
+                }
+                if (field.type === "table" && field.key === "tools") {
+                  return <SimpleTable key={field.key} headers={["Item", "Qty", "Serial"]} rows={tools.map((item) => [item.description || "", item.quantity || "", item.serial_id || ""])} />;
+                }
+                if (field.type === "table" && field.key === "gateLog") {
+                  return <SimpleTable key={field.key} headers={["When", "Direction", "Note"]} rows={gateLogs.map((item) => [item.logged_on || item.created_at || "", item.direction || "", item.note || ""])} />;
+                }
+                if (field.type === "checkboxGroup" || field.type === "radio") {
+                  const picked = selectedKeys(fieldValue(field), field.options || []);
+                  return (
+                    <div key={field.key} className="border border-[#808080] p-2" style={{ gridColumn: "1 / -1" }}>
+                      <p className="mb-1 text-[11px] font-bold text-slate-700">{field.label}</p>
+                      <div className="flex flex-wrap gap-x-3 gap-y-1">
+                        {(field.options || []).map((option) => (
+                          <span key={option.key} className="inline-flex items-center text-[11px] text-slate-900">
+                            <Box on={picked.includes(option.key)} /> {option.label}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+                if (field.type === "statement") {
+                  const match = statements.find((item) => item.text === field.label);
+                  const accepted = match ? match.accepted : Boolean(values.declarantName);
+                  return (
+                    <p key={field.key} className="border border-[#808080] px-2 py-1 text-[11px] leading-5 text-slate-900" style={{ gridColumn: "1 / -1" }}>
+                      <Box on={accepted} /> {field.label}
+                    </p>
+                  );
+                }
+                if (field.type === "signature") {
+                  return (
+                    <div key={field.key} className="col-span-8 border border-[#808080] p-2">
+                      <p className="text-[11px] font-bold text-slate-700">Signature</p>
+                      {signatureUrl ? <img src={signatureUrl} alt="Signature" className="mt-1 h-14 object-contain" /> : <p className="text-[11px] text-slate-700">—</p>}
+                      <p className="text-[11px] text-slate-900">{text(values.declarantName)}</p>
+                      <p className="text-[11px] text-slate-700">{text(values.submittedAt || values.signedDate)}</p>
+                    </div>
+                  );
+                }
+                if (field.type === "fileList") {
+                  return (
+                    <div key={field.key} className="border border-[#808080] p-2 text-[11px] text-slate-900" style={{ gridColumn: "1 / -1" }}>
+                      <p className="font-bold text-slate-700">{field.label}</p>
+                      {documents.length ? documents.map((doc) => <p key={doc.file_name}>{doc.href ? <a className="underline" href={doc.href}>{doc.file_name}</a> : doc.file_name}</p>) : <p>—</p>}
+                    </div>
+                  );
+                }
+                const span = field.span ?? 12;
+                return (
+                  <div key={field.key} className="border border-[#808080] p-2" style={{ gridColumn: `span ${span} / span ${span}` }}>
+                    <p className="text-[10px] font-bold uppercase text-slate-700">{field.label}</p>
+                    <p className="whitespace-pre-wrap text-[12px] text-slate-900">{text(fieldValue(field)) || "—"}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        ))}
+
+        {form.hse.length > 0 && (
+          <section>
+            <div className="grid grid-cols-[120px_1fr] bg-[#13294B] text-white">
+              <p className="px-2 py-1 text-[11px] font-bold">SECTION VI</p>
+              <p className="px-2 py-1 text-[11px] font-bold">HEALTH, SAFETY AND ENVIRONMENT REQUIREMENTS</p>
+            </div>
+            {form.hse.map((block) => (
+              <div key={block.id} className="border border-[#808080] p-2">
+                <p className="bg-[#DCE6F3] px-2 py-1 text-[11px] font-bold text-[#13294B]">{block.id}) {block.title}</p>
+                <ul className="mt-1 space-y-0.5 text-[11px] text-slate-900">
+                  {block.items.map((item) => <li key={item}><Box on /> {item}</li>)}
+                </ul>
+              </div>
+            ))}
+            <div className="flex flex-wrap gap-2 border border-[#808080] p-2 text-[11px] font-bold">
+              <span className="bg-green-600 px-2 py-1 text-white">GREEN TAG – Safe for use</span>
+              <span className="bg-yellow-300 px-2 py-1 text-slate-900">YELLOW TAG – Use with caution</span>
+              <span className="bg-red-600 px-2 py-1 text-white">RED TAG – Do not use</span>
+            </div>
+          </section>
         )}
       </div>
     </article>
+  );
+}
+
+function SimpleTable({ headers, rows }: { headers: string[]; rows: string[][] }) {
+  return (
+    <div style={{ gridColumn: "1 / -1" }}>
+      <table className="w-full border-collapse text-[11px]">
+        <thead>
+          <tr>{headers.map((header) => <th key={header} className="border border-[#808080] bg-[#F5F5F5] px-1 py-1 text-left font-bold text-slate-700">{header}</th>)}</tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 && <tr><td className="border border-[#808080] px-1 py-1 text-slate-700" colSpan={headers.length}>None listed</td></tr>}
+          {rows.map((row, index) => (
+            <tr key={index}>{row.map((cell, cellIndex) => <td key={cellIndex} className="border border-[#808080] px-1 py-1 text-slate-900">{cell || "—"}</td>)}</tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
