@@ -1,5 +1,5 @@
 import { optionList, type FormDefinition } from "./shared";
-import { form07 } from "./form-07";
+import { CRITICAL_WORK_OPTIONS, form07, LIGHT_WORK_OPTIONS } from "./form-07";
 
 export const form07a: FormDefinition = {
   id: "form-07a",
@@ -35,8 +35,13 @@ export const form07a: FormDefinition = {
       title: "WORK SCOPE & HAZARDS",
       fields: [
         { key: "workScope", label: "Work to be done (make-safe / repair)", type: "textarea", span: 24 },
-        { key: "validFrom", label: "Permit valid from", type: "text", span: 12 },
-        { key: "validUntil", label: "Valid until (max 12 hrs)", type: "text", span: 12 },
+        { key: "workType", label: "Type of work — tick for EHSQ", type: "checkboxGroup", span: 24, options: optionList(["Light Works", "Critical Works"]) },
+        { key: "lightWorks", label: "Normal activity", type: "checkboxGroup", span: 24, options: optionList(LIGHT_WORK_OPTIONS) },
+        { key: "criticalWorks", label: "Critical works", type: "checkboxGroup", span: 24, options: optionList(CRITICAL_WORK_OPTIONS) },
+        { key: "validFrom", label: "Permit valid from", type: "text", span: 8 },
+        { key: "timeFrom", label: "Time from", type: "time", span: 4 },
+        { key: "validUntil", label: "Valid until (max 12 hrs)", type: "text", span: 8 },
+        { key: "timeTo", label: "Time to", type: "time", span: 4 },
         { key: "supervisor", label: "Supervisor", type: "table", span: 24 },
       ],
     },

@@ -77,19 +77,19 @@ export function OfficialFormView({
   }
 
   return (
-    <article className="official-form max-w-full overflow-x-auto bg-white text-slate-900" style={{ colorScheme: "light" }}>
-      <div className="min-w-[760px] border border-[#808080] bg-white">
-        <header className="grid grid-cols-[110px_1fr_210px] items-center gap-3 border-b border-[#808080] p-3">
+    <article className="official-form max-w-full overflow-x-auto text-slate-900" style={{ colorScheme: "light", background: "#fff" }}>
+      <div className="official-sheet min-w-0 border border-[#808080] bg-white sm:min-w-[760px]" style={{ background: "#fff" }}>
+        <header className="official-head grid grid-cols-1 items-center gap-3 border-b border-[#808080] p-3 sm:grid-cols-[110px_1fr_210px]">
           <img src="/sma-logo.jpg" alt="Sharjah Maritime Academy" className="h-20 w-auto object-contain" />
           <div>
             <p className="text-[11px] font-bold tracking-[0.14em] text-[#13294B]">SHARJAH MARITIME ACADEMY</p>
             <h2 className="text-lg font-bold text-[#13294B]">{form.title}</h2>
           </div>
-          <div className="text-right text-[11px] italic text-slate-700">
+          <div className="text-left text-[11px] italic text-slate-700 sm:text-right">
             <p>{form.reference}</p>
             <p>For Official Use Only</p>
             <p className="mt-1 not-italic font-bold text-slate-900">{form.numberLabel} {refNo}</p>
-            <p className="not-italic capitalize">{status.replace(/_/g, " ")}</p>
+            <p className={`not-italic text-sm font-bold capitalize ${status === "rejected" || status === "cancelled" ? "text-red-700" : status === "approved" || status === "approved_with_conditions" || status === "active" ? "text-green-700" : "text-slate-900"}`}>{status.replace(/_/g, " ")}</p>
           </div>
         </header>
         <div className="h-1 bg-[#B8963E]" />
@@ -103,7 +103,7 @@ export function OfficialFormView({
               <p className="px-2 py-1 text-[11px] font-bold">{section.code}</p>
               <p className="px-2 py-1 text-[11px] font-bold">{section.title}</p>
             </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(24, minmax(0, 1fr))" }}>
+        <div className="official-fields" style={{ display: "grid", gridTemplateColumns: "repeat(24, minmax(0, 1fr))" }}>
               {section.fields.map((field) => {
                 if (field.type === "table" && (field.key === "workers" || field.key === "supervisor")) {
                   return (

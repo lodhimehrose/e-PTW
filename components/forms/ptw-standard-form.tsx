@@ -6,7 +6,6 @@ import Link from "next/link";
 import { FormWizard } from "@/components/form-wizard";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FieldError } from "@/components/field-error";
 import { SignaturePadField } from "@/components/signature-pad";
@@ -20,6 +19,7 @@ import type { CompanyMatch } from "@/app/actions/roster";
 import { WorkersEditor } from "@/components/workers-editor";
 import { workerFieldError, validateEidAfterWorkEnd, validateWorkersEidUnique, type WorkerInput } from "@/lib/validations/worker";
 import { SECTION_IV_UNDERTAKINGS } from "@/lib/constants";
+import { CRITICAL_ACTIVITY, NORMAL_ACTIVITY, toggleItem, WorkScopePanel } from "@/components/forms/work-scope-panel";
 import { addWorkingDays, dubaiToday } from "@/lib/working-days";
 import { format } from "date-fns";
 
@@ -29,8 +29,13 @@ type Draft = {
   applicantName: string;
   department: string;
   workDescription: string;
+  workType: string[];
+  lightWorks: string[];
+  criticalWorks: string[];
   startDate: string;
   endDate: string;
+  timeFrom: string;
+  timeTo: string;
   building: string;
   floorArea: string;
   ppe: string[];
@@ -58,8 +63,13 @@ const initial: Draft = {
   applicantName: "",
   department: "",
   workDescription: "",
+  workType: [],
+  lightWorks: [],
+  criticalWorks: [],
   startDate: "",
   endDate: "",
+  timeFrom: "",
+  timeTo: "",
   building: "Building 1",
   floorArea: "",
   ppe: [],
@@ -118,9 +128,10 @@ export function PtwStandardForm() {
       else if (data.tradeLicenseExpiry < today) e.tradeLicenseExpiry = "Trade license is expired. Update the trade license before anyone from this company can apply.";
       if (!data.tradeLicenseFile) e.tradeLicenseFile = "Upload the trade license";
     }
-    if (s === 2 && data.workDescription.length < 30) e.workDescription = "Min 30 chars";
-    if (s === 3) {
-      if (!data.startDate || !data.endDate) e.endDate = "Required";
+    if (s === 2) {
+      if (data.workDescription.length < 30) e.workDescription = "Describe the scope in at least 30 characters";
+      if (!data.workType?.length) e.workType = "Tick normal activity, critical work, or both";
+      if (!data.startDate || !data.endDate || !data.timeFrom || !data.timeTo) e.time = "Enter the date and time from and to";
       const min = addWorkingDays(dubaiToday(), 3, [6, 0], []);
       if (data.startDate && new Date(data.startDate) < min) e.startDate = "notice";
     }
@@ -162,8 +173,8 @@ export function PtwStandardForm() {
       companyName: data.companyName,
       contactEmail: data.applicantEmail,
       building: data.building,
-      startAt: data.startDate,
-      endAt: data.endDate,
+      startAt: data.timeFrom ? `${data.startDate}T${data.timeFrom}` : data.startDate,
+      endAt: data.timeTo ? `${data.endDate}T${data.timeTo}` : data.endDate,
       maxWorkers: attending.length,
       signatureDataUrl: data.signatureDataUrl,
       documents: [
@@ -185,6 +196,13 @@ export function PtwStandardForm() {
         supervisorName: data.supervisorName,
         supervisorPhone: data.supervisorPhone,
         workDescription: data.workDescription,
+        workType: data.workType,
+        lightWorks: data.lightWorks,
+        criticalWorks: data.criticalWorks,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        timeFrom: data.timeFrom,
+        timeTo: data.timeTo,
         floorArea: data.floorArea,
         ppe: data.ppe,
         undertakings: SECTION_IV_UNDERTAKINGS.filter((_, index) => data.undertakings[index]),
@@ -230,7 +248,7 @@ export function PtwStandardForm() {
 
   return (
     <div className="space-y-4">
-    <FormWizard step={step} totalSteps={5} stepTitle={["Applicant", "Work", "Dates", "PPE & docs", "Sign"] [step - 1]} onBack={() => setStep((s) => s - 1)} onNext={() => validate(step) && setStep((s) => s + 1)} isLast={step === 5} onSubmit={handleSubmit} submitting={submitting}>
+    <FormWizard step={step} totalSteps={5} stepTitle={["Applicant", "Scope", "Location", "PPE & docs", "Sign"][step - 1]} onBack={() => setStep((s) => s - 1)} onNext={() => validate(step) && setStep((s) => s + 1)} isLast={step === 5} onSubmit={handleSubmit} submitting={submitting}>
       {step === 1 && (
         <div className="grid gap-3">
           <Input value={data.companyName} onChange={(e) => setData({ ...data, companyName: e.target.value })} placeholder="Company *" />
@@ -257,18 +275,44 @@ export function PtwStandardForm() {
           <Input value={data.department} onChange={(e) => setData({ ...data, department: e.target.value })} placeholder="SMA requesting department *" />
         </div>
       )}
-      {step === 2 && <Textarea value={data.workDescription} onChange={(e) => setData({ ...data, workDescription: e.target.value })} placeholder="Scope (min 30 characters) *" />}
+      {step === 2 && (
+        <WorkScopePanel
+          scope={data.workDescription}
+          onScope={(workDescription) => setData({ ...data, workDescription })}
+          activities={data.workType ?? []}
+          lightWorks={data.lightWorks ?? []}
+          criticalWorks={data.criticalWorks ?? []}
+          onToggleActivity={(item) => setData({
+            ...data,
+            workType: toggleItem(data.workType, item),
+            lightWorks: item === NORMAL_ACTIVITY && data.workType?.includes(NORMAL_ACTIVITY) ? [] : data.lightWorks,
+            criticalWorks: item === CRITICAL_ACTIVITY && data.workType?.includes(CRITICAL_ACTIVITY) ? [] : data.criticalWorks,
+          })}
+          onToggleLight={(item) => setData({ ...data, lightWorks: toggleItem(data.lightWorks, item) })}
+          onToggleCritical={(item) => setData({ ...data, criticalWorks: toggleItem(data.criticalWorks, item) })}
+          fromDate={data.startDate}
+          fromTime={data.timeFrom}
+          toDate={data.endDate}
+          toTime={data.timeTo}
+          onFromDate={(startDate) => setData({ ...data, startDate })}
+          onFromTime={(timeFrom) => setData({ ...data, timeFrom })}
+          onToDate={(endDate) => setData({ ...data, endDate })}
+          onToTime={(timeTo) => setData({ ...data, timeTo })}
+          scopeError={errors.workDescription}
+          timeError={errors.time}
+          activityError={errors.workType}
+          notice={errors.startDate === "notice" ? <p className="mt-2 text-sm text-red-600">Need 3 working days — use <Link href="/ptw/emergency" className="underline">Emergency PTW</Link></p> : null}
+        />
+      )}
       {step === 3 && (
-        <>
-          <Input type="date" value={data.startDate} onChange={(e) => setData({ ...data, startDate: e.target.value })} />
-          {errors.startDate === "notice" && <p className="text-sm text-red-600">Need 3 working days — use <Link href="/ptw/emergency" className="underline">Emergency PTW</Link></p>}
-          <Input type="date" value={data.endDate} onChange={(e) => setData({ ...data, endDate: e.target.value })} />
-          <Input value={data.floorArea} onChange={(e) => setData({ ...data, floorArea: e.target.value })} placeholder="Floor / area *" />
-        </>
+        <div>
+          <Label>Floor / area *</Label>
+          <Input className="mt-1" value={data.floorArea} onChange={(e) => setData({ ...data, floorArea: e.target.value })} placeholder="Building, floor, and area" />
+        </div>
       )}
       {step === 4 && (
         <>
-          {["Fire extinguishers", "Safety helmet & safety shoes", "Safety vest"].map((p) => (
+          {["Fire extinguishers", "Safety helmet & safety shoes", "Safety vest", "Full body harness (double lanyard)", "Gas detector", "Ear plugs / mask / gloves", "Warning signs / safety barriers", "Others"].map((p) => (
             <label key={p} className="flex gap-2 text-sm"><Checkbox checked={data.ppe.includes(p)} onCheckedChange={(c) => setData({ ...data, ppe: c ? [...data.ppe, p] : data.ppe.filter((x) => x !== p) })} />{p}</label>
           ))}
           <FileUploadField

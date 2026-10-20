@@ -31,9 +31,9 @@ export function FormWizard({
   return (
     <div className="space-y-6">
       <div>
-        <div className="mb-2 flex justify-between text-sm">
-          <span className="font-medium text-sma-navy">Step {step} of {totalSteps}</span>
-          <span className="text-muted-foreground">{stepTitle}</span>
+        <div className="mb-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step {step} of {totalSteps}</p>
+          <h2 className="text-xl font-bold text-foreground sm:text-2xl">{stepTitle}</h2>
         </div>
         <Progress value={progress} />
       </div>

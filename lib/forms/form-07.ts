@@ -1,6 +1,25 @@
 import { HSE_SECTIONS } from "@/lib/hse-requirements";
 import { optionList, type FormDefinition } from "./shared";
 
+export const LIGHT_WORK_OPTIONS = [
+  "Light maintenance works",
+  "Minor repair works",
+  "Routine PPM/RM",
+  "CCTV / IT / System related work",
+  "Others",
+];
+
+export const CRITICAL_WORK_OPTIONS = [
+  "Hot work (Welding / Grinding)",
+  "Excavation (≥ 30 cm)",
+  "Work at height (1.8 m and above)",
+  "Entry into Confined Space",
+  "Isolation / impairment of fire life safety system",
+  "Crane / Hoist operation",
+  "Fit-out / modification work",
+  "Work on/near unprotected energized system / LV & HV room",
+];
+
 export const FORM_07_UNDERTAKINGS = [
   { key: "u1", text: "I confirm that all required safety precautions are in place, and I am fully responsible for their implementation." },
   { key: "u2", text: "I confirm that the number of workers on site will not exceed the maximum approved in Section II-F, and that all workers listed in Section III hold a valid Emirates ID." },
@@ -43,9 +62,9 @@ export const form07: FormDefinition = {
       code: "SECTION II",
       title: "WORK APPLICATION DETAILS",
       fields: [
-        { key: "workType", label: "A) Type of Work", type: "radio", span: 24, options: optionList(["Light Works", "Critical Works"]) },
-        { key: "lightWorks", label: "Light works", type: "checkboxGroup", span: 24, options: optionList(["Light maintenance works", "Minor repair works", "Routine PPM/RM", "CCTV / IT / System related work", "Others"]) },
-        { key: "criticalWorks", label: "Critical works", type: "checkboxGroup", span: 24, options: optionList(["Hot work (Welding / Grinding)", "Excavation (≥ 30 cm)", "Work at height (1.8 m and above)", "Entry into Confined Space", "Isolation / impairment of fire life safety system", "Crane / Hoist operation", "Fit-out / modification work", "Work on/near unprotected energized system / LV & HV room"]) },
+        { key: "workType", label: "A) Type of Work — tick for EHSQ", type: "checkboxGroup", span: 24, options: optionList(["Light Works", "Critical Works"]) },
+        { key: "lightWorks", label: "Normal activity", type: "checkboxGroup", span: 24, options: optionList(LIGHT_WORK_OPTIONS) },
+        { key: "criticalWorks", label: "Critical works", type: "checkboxGroup", span: 24, options: optionList(CRITICAL_WORK_OPTIONS) },
         { key: "workDescription", label: "Detailed description of the nature & scope of work", type: "textarea", span: 24 },
         { key: "startDate", label: "Date from", type: "date", span: 6 },
         { key: "endDate", label: "Date to", type: "date", span: 6 },

@@ -65,3 +65,13 @@
     border-color: hsl(var(--border));
   }
 }
+
+@media (max-width: 767px) {
+  .official-form .official-sheet {
+    min-width: 0 !important;
+  }
+
+  .official-form .official-fields > * {
+    grid-column: 1 / -1 !important;
+  }
+}

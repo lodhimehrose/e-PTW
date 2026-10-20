@@ -4,6 +4,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { SubmissionActions } from "@/components/admin/submission-actions";
 import { EditSubmissionForm, IssueGatePassForm } from "@/components/admin/submission-tools";
 import { getSignedUrl } from "@/lib/storage";
+import { EhsqClassification } from "@/components/admin/ehsq-classification";
 import { GatePassEditor } from "@/components/admin/gate-pass-editor";
 import { OfficialFormView } from "@/components/admin/official-form-view";
 
@@ -208,6 +209,15 @@ export default async function SubmissionDetailPage({
           ))}
         </ul>
       </section>
+      )}
+
+      {sub.type !== "gate_pass" && (
+        <EhsqClassification
+          id={sub.id}
+          workType={data.workType}
+          lightWorks={data.lightWorks}
+          criticalWorks={data.criticalWorks}
+        />
       )}
 
       <SubmissionActions id={sub.id} type={sub.type} />

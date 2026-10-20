@@ -40,7 +40,7 @@ export function SubmissionActions({
         onChange={(e) => setNote(e.target.value)}
       />
       <div className="flex flex-wrap gap-2">
-        <Button disabled={loading} onClick={() => decide("approved")}>
+        <Button disabled={loading} className="bg-green-600 text-white hover:bg-green-700" onClick={() => decide("approved")}>
           Approve
         </Button>
         <Button

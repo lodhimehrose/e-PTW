@@ -18,6 +18,7 @@ import { CompanyPicker } from "@/components/company-picker";
 import type { CompanyMatch } from "@/app/actions/roster";
 import { format } from "date-fns";
 import { SECTION_IV_UNDERTAKINGS } from "@/lib/constants";
+import { CRITICAL_ACTIVITY, NORMAL_ACTIVITY, toggleItem, WorkScopePanel } from "@/components/forms/work-scope-panel";
 
 const APPENDIX_B = `1. Emergency breakdowns only — cannot wait 3 working days.
 2. Planned works need Standard PTW (Form-07).
@@ -51,6 +52,9 @@ type Draft = {
   maxWorkers: string;
   workers: WorkerInput[];
   workScope: string;
+  workType: string[];
+  lightWorks: string[];
+  criticalWorks: string[];
   validFrom: string;
   validUntil: string;
   safetyControls: string[];
@@ -78,6 +82,9 @@ const initial: Draft = {
   maxWorkers: "5",
   workers: [{ fullName: "", trade: "", emiratesId: "", eidExpiry: "", mobile: "", inductionDone: "no" }],
   workScope: "",
+  workType: [],
+  lightWorks: [],
+  criticalWorks: [],
   validFrom: new Date().toISOString().slice(0, 16),
   validUntil: "",
   safetyControls: [],
@@ -144,7 +151,13 @@ export function PtwEmergencyForm() {
         e["workers.0"] = "The supervisor's Emirates ID expires before the job ends. Provide an updated ID.";
       }
     }
-    if (s === 3 && (!data.workScope || !data.validUntil)) e.workScope = "Required";
+    if (s === 3) {
+      if (!data.workScope || data.workScope.trim().length < 10) e.workScope = "Describe the scope of the emergency work";
+      if (!data.workType?.length) e.workType = "Tick normal activity, critical work, or both";
+      const fromOk = data.validFrom?.includes("T") && data.validFrom.slice(11, 16);
+      const untilOk = data.validUntil?.includes("T") && data.validUntil.slice(11, 16);
+      if (!fromOk || !untilOk) e.time = "Enter the date and time from and to";
+    }
     if (s === 4 && data.safetyControls.length !== SAFETY_CONTROLS.length) e.safety = "Confirm all 8";
     if (s === 5) {
       if (!data.undertakings.every(Boolean)) e.undertakings = "Confirm each statement in Section IV";
@@ -190,6 +203,12 @@ export function PtwEmergencyForm() {
         declarantName: data.declarantName,
         declarantDesignation: data.declarantDesignation,
         workScope: data.workScope,
+        workDescription: data.workScope,
+        workType: data.workType,
+        lightWorks: data.lightWorks,
+        criticalWorks: data.criticalWorks,
+        timeFrom: data.validFrom?.slice(11, 16),
+        timeTo: data.validUntil?.slice(11, 16),
         validFrom: data.validFrom,
         validUntil: data.validUntil,
         safetyControls: data.safetyControls,
@@ -231,7 +250,7 @@ export function PtwEmergencyForm() {
         <div className="space-y-3">
           <p className="text-center font-bold text-red-600">URGENT</p>
           <Textarea value={data.description} onChange={(e) => setData({ ...data, description: e.target.value })} placeholder="Emergency description *" />
-          {["Safety of people", "Fire / life safety", "Critical SMA operations"].map((r) => (
+          {["Safety of people", "Fire / life safety", "Water leak / flooding", "Power failure", "Person trapped in lift", "Security breach", "Critical SMA operations", "Others"].map((r) => (
             <label key={r} className="flex gap-2 text-sm"><Checkbox checked={data.risks.includes(r)} onCheckedChange={(c) => setData({ ...data, risks: c ? [...data.risks, r] : data.risks.filter((x) => x !== r) })} />{r}</label>
           ))}
           <Input value={data.reportedBy} onChange={(e) => setData({ ...data, reportedBy: e.target.value })} placeholder="Reported by *" />
@@ -288,11 +307,32 @@ export function PtwEmergencyForm() {
         </>
       )}
       {step === 3 && (
-        <>
-          <Textarea value={data.workScope} onChange={(e) => setData({ ...data, workScope: e.target.value })} />
-          <Input type="datetime-local" value={data.validFrom} onChange={(e) => setData({ ...data, validFrom: e.target.value })} />
-          <Input type="datetime-local" value={data.validUntil} onChange={(e) => setData({ ...data, validUntil: e.target.value })} />
-        </>
+        <WorkScopePanel
+          scope={data.workScope}
+          onScope={(workScope) => setData({ ...data, workScope })}
+          activities={data.workType ?? []}
+          lightWorks={data.lightWorks ?? []}
+          criticalWorks={data.criticalWorks ?? []}
+          onToggleActivity={(item) => setData({
+            ...data,
+            workType: toggleItem(data.workType, item),
+            lightWorks: item === NORMAL_ACTIVITY && data.workType?.includes(NORMAL_ACTIVITY) ? [] : data.lightWorks,
+            criticalWorks: item === CRITICAL_ACTIVITY && data.workType?.includes(CRITICAL_ACTIVITY) ? [] : data.criticalWorks,
+          })}
+          onToggleLight={(item) => setData({ ...data, lightWorks: toggleItem(data.lightWorks, item) })}
+          onToggleCritical={(item) => setData({ ...data, criticalWorks: toggleItem(data.criticalWorks, item) })}
+          fromDate={data.validFrom?.slice(0, 10) ?? ""}
+          fromTime={data.validFrom?.slice(11, 16) ?? ""}
+          toDate={data.validUntil?.slice(0, 10) ?? ""}
+          toTime={data.validUntil?.slice(11, 16) ?? ""}
+          onFromDate={(date) => setData({ ...data, validFrom: date ? `${date}T${data.validFrom?.slice(11, 16) || ""}` : "" })}
+          onFromTime={(time) => setData({ ...data, validFrom: `${data.validFrom?.slice(0, 10) || ""}T${time}` })}
+          onToDate={(date) => setData({ ...data, validUntil: date ? `${date}T${data.validUntil?.slice(11, 16) || ""}` : "" })}
+          onToTime={(time) => setData({ ...data, validUntil: `${data.validUntil?.slice(0, 10) || ""}T${time}` })}
+          scopeError={errors.workScope}
+          timeError={errors.time}
+          activityError={errors.workType}
+        />
       )}
       {step === 4 && SAFETY_CONTROLS.map((c) => (
         <label key={c} className="flex gap-2 text-sm"><Checkbox checked={data.safetyControls.includes(c)} onCheckedChange={(ch) => setData({ ...data, safetyControls: ch ? [...data.safetyControls, c] : data.safetyControls.filter((x) => x !== c) })} />{c}</label>

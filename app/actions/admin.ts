@@ -364,6 +364,36 @@ export async function issueGatePass(
   return { ok: true as const, id: row.id as string, refNo: row.ref_no as string };
 }
 
+export async function saveWorkClassification(
+  id: string,
+  input: { workType: string[]; lightWorks: string[]; criticalWorks: string[] },
+) {
+  const { user } = await requireAdmin();
+  const supabase = createServiceClient();
+  const { data: current } = await supabase.from("submissions").select("data").eq("id", id).single();
+  if (!current) return { ok: false as const, error: "Not found" };
+  await supabase
+    .from("submissions")
+    .update({
+      data: {
+        ...((current.data as Record<string, unknown>) ?? {}),
+        workType: input.workType,
+        lightWorks: input.lightWorks,
+        criticalWorks: input.criticalWorks,
+      },
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+  await supabase.from("audit_log").insert({
+    submission_id: id,
+    action: "ehsq_classification",
+    note: input.workType.join(", ") || "Classification cleared",
+    actor: user.email,
+  });
+  revalidatePath(`/admin/submissions/${id}`);
+  return { ok: true as const };
+}
+
 export async function saveGatePass(
   id: string,
   input: { purpose: string; building: string; workers: { id: string; fullName: string; trade: string; mobile: string }[] },
