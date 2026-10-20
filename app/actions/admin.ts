@@ -58,8 +58,38 @@ export async function decideSubmission(
   const site = process.env.NEXT_PUBLIC_SITE_URL ?? "";
   const verifyUrl = `${site}/verify/${sub.verify_token}`;
 
+  const saved = await supabase
+    .from("submissions")
+    .update({
+      status,
+      decision_note: note || null,
+      approved_at: decision === "rejected" ? null : now,
+    })
+    .eq("id", id);
+  if (saved.error) return { ok: false as const, error: "Could not save the decision." };
+
+  await supabase.from("audit_log").insert({
+    submission_id: id,
+    action: status,
+    note,
+    actor: user.email,
+  });
+
+  if (sub.type !== "gate_pass") {
+    await supabase
+      .from("submissions")
+      .update({
+        status,
+        decision_note: note || (decision === "rejected" ? null : "Issued with the approved permit"),
+        approved_at: decision === "rejected" ? null : now,
+      })
+      .eq("linked_ref_no", sub.ref_no)
+      .eq("type", "gate_pass");
+  }
+
   let approvedPdfPath: string | null = null;
 
+  try {
   if (decision !== "rejected") {
     const qrDataUrl = await QRCode.toDataURL(verifyUrl, { margin: 1, width: 160 });
     const pdfBuf = await renderSubmissionPdf({
@@ -102,6 +132,7 @@ export async function decideSubmission(
         <p><a href="${verifyUrl}">Verify permit</a></p>`,
       attachments: [{ filename: `${sub.ref_no}-approved.pdf`, content: pdfBuf }],
     });
+    await supabase.from("submissions").update({ approved_pdf_url: approvedPdfPath }).eq("id", id);
   } else {
     const recipients = uniqueAddresses([
       sub.contact_email,
@@ -116,38 +147,14 @@ export async function decideSubmission(
         <p><a href="${site}">Submit again</a></p>`,
     });
   }
-
-  await supabase
-    .from("submissions")
-    .update({
-      status,
-      decision_note: note || null,
-      approved_at: decision === "rejected" ? null : now,
-      approved_pdf_url: approvedPdfPath,
-    })
-    .eq("id", id);
-
-  await supabase.from("audit_log").insert({
-    submission_id: id,
-    action: status,
-    note,
-    actor: user.email,
-  });
+  } catch (error) {
+    console.error("Decision saved, but the email or PDF did not finish", error);
+  }
 
   revalidatePath("/admin");
+  revalidatePath("/admin/submissions");
   revalidatePath(`/admin/submissions/${id}`);
-  if (sub.type !== "gate_pass") {
-    await supabase
-      .from("submissions")
-      .update({
-        status,
-        decision_note: note || (decision === "rejected" ? null : "Issued with the approved permit"),
-        approved_at: decision === "rejected" ? null : now,
-      })
-      .eq("linked_ref_no", sub.ref_no)
-      .eq("type", "gate_pass");
-  }
-  return { ok: true as const };
+  return { ok: true as const, status };
 }
 
 export async function updateSubmissionStatus(
@@ -173,6 +180,8 @@ export async function updateSubmissionStatus(
     actor: user.email,
   });
   revalidatePath("/admin");
+  revalidatePath("/admin/submissions");
+  revalidatePath(`/admin/submissions/${id}`);
   return { ok: true as const };
 }
 

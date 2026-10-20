@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { saveGatePass } from "@/app/actions/admin";
+import { notify } from "@/components/notice-bar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,6 +40,7 @@ export function GatePassEditor({
     });
     setSaving(false);
     setMessage(result.ok ? "Gate pass saved." : result.error);
+    notify(result.ok ? "Gate pass saved" : result.error || "Could not save the gate pass", result.ok ? "ok" : "error");
     if (result.ok) router.refresh();
   }
 

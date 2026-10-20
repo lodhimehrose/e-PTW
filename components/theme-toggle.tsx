@@ -1,36 +1,56 @@
 "use client";
 
-import { Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 
+export type ThemeName = "light" | "dark" | "midnight";
+
+const OPTIONS: { id: ThemeName; label: string }[] = [
+  { id: "light", label: "Cream" },
+  { id: "dark", label: "Dark" },
+  { id: "midnight", label: "Midnight" },
+];
+
+export function applyTheme(theme: ThemeName) {
+  const root = document.documentElement;
+  root.classList.toggle("dark", theme === "dark" || theme === "midnight");
+  root.classList.toggle("midnight", theme === "midnight");
+  localStorage.setItem("sma-theme", theme);
+}
+
 export function ThemeToggle({ tone = "onDark" }: { tone?: "onDark" | "onLight" }) {
-  const [dark, setDark] = useState(false);
+  const [theme, setTheme] = useState<ThemeName>("light");
 
   useEffect(() => {
-    setDark(document.documentElement.classList.contains("dark"));
+    const saved = localStorage.getItem("sma-theme");
+    if (saved === "dark" || saved === "midnight" || saved === "light") setTheme(saved);
+    else if (document.documentElement.classList.contains("midnight")) setTheme("midnight");
+    else if (document.documentElement.classList.contains("dark")) setTheme("dark");
   }, []);
 
-  function toggle() {
-    const next = !document.documentElement.classList.contains("dark");
-    document.documentElement.classList.toggle("dark", next);
-    localStorage.setItem("sma-theme", next ? "dark" : "light");
-    setDark(next);
+  function choose(next: ThemeName) {
+    applyTheme(next);
+    setTheme(next);
   }
 
-  const styles =
-    tone === "onDark"
-      ? "border-white/20 bg-white/10 text-white hover:bg-white/15"
-      : "border-border bg-card text-foreground hover:bg-muted";
+  const shell = tone === "onDark" ? "border-white/25 bg-white/10" : "border-border bg-card";
 
   return (
-    <button
-      type="button"
-      onClick={toggle}
-      aria-label={dark ? "Switch to cream theme" : "Switch to dark theme"}
-      className={`inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-medium ${styles}`}
-    >
-      {dark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
-      {dark ? "Cream" : "Dark"}
-    </button>
+    <div className={`inline-flex rounded-full border p-0.5 text-[11px] font-semibold ${shell}`} role="tablist" aria-label="Theme">
+      {OPTIONS.map((option) => {
+        const active = theme === option.id;
+        return (
+          <button
+            key={option.id}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => choose(option.id)}
+            className={`rounded-full px-2.5 py-1 ${active ? "bg-[#B8963E] text-[#13294B]" : tone === "onDark" ? "text-white" : "text-foreground"}`}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { saveWorkClassification } from "@/app/actions/admin";
 import { CRITICAL_ACTIVITY, NORMAL_ACTIVITY, toggleItem } from "@/components/forms/work-scope-panel";
 import { CRITICAL_WORK_OPTIONS, LIGHT_WORK_OPTIONS } from "@/lib/forms/form-07";
+import { notify } from "@/components/notice-bar";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -41,6 +42,7 @@ export function EhsqClassification({
     });
     setSaving(false);
     setMessage(result.ok ? "Classification saved on the permit." : result.error);
+    notify(result.ok ? "Classification saved" : result.error || "Could not save the classification", result.ok ? "ok" : "error");
     if (result.ok) router.refresh();
   }
 

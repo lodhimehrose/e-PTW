@@ -27,18 +27,35 @@ export async function GET(request: Request, { params }: { params: { ref: string 
   }
   if (!allowed) return NextResponse.json({ error: "Sign in to download this PDF." }, { status: 401 });
 
-  const logo = readFileSync(path.join(process.cwd(), "public", "sma-logo.jpg")).toString("base64");
-  const pdf = await renderSubmissionPdf({
+  let logoDataUrl: string | undefined;
+  try {
+    const logo = readFileSync(path.join(process.cwd(), "public", "sma-logo.jpg"));
+    logoDataUrl = `data:image/jpeg;base64,${logo.toString("base64")}`;
+  } catch {
+    logoDataUrl = undefined;
+  }
+  const payload = {
     refNo: sub.ref_no,
     type: sub.type,
     formTitle: formDisplayName(sub.type),
     companyName: sub.company_name ?? "",
     status: sub.status,
     data: (sub.data as Record<string, unknown>) ?? {},
-    workers: sub.workers ?? [],
-    logoDataUrl: `data:image/jpeg;base64,${logo}`,
-  });
-  const filename = `${sub.ref_no} ${formDisplayName(sub.type)}.pdf`;
+    workers: Array.isArray(sub.workers) ? sub.workers : [],
+  };
+  let pdf: Buffer;
+  try {
+    pdf = await renderSubmissionPdf({ ...payload, logoDataUrl });
+  } catch (error) {
+    console.error("PDF render failed, retrying without the logo", error);
+    try {
+      pdf = await renderSubmissionPdf(payload);
+    } catch (retryError) {
+      console.error(retryError);
+      return NextResponse.json({ error: "Could not build this PDF." }, { status: 500 });
+    }
+  }
+  const filename = `${sub.ref_no} ${formDisplayName(sub.type)}.pdf`.replace(/[^\w.\- ]+/g, "");
   return new NextResponse(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",

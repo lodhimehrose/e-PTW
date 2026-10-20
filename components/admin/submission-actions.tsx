@@ -10,6 +10,7 @@ import {
   addRevalidation,
   addGateLog,
 } from "@/app/actions/admin";
+import { notify } from "@/components/notice-bar";
 
 export function SubmissionActions({
   id,
@@ -20,15 +21,25 @@ export function SubmissionActions({
 }) {
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState("");
   const router = useRouter();
 
   async function decide(decision: "approved" | "approved_with_conditions" | "rejected") {
+    const label = decision === "rejected" ? "Rejected" : decision === "approved_with_conditions" ? "Approved with conditions" : "Approved";
     setLoading(true);
-    const res = await decideSubmission(id, decision, note);
-    setLoading(false);
-    setMsg(res.ok ? "Decision saved." : res.error ?? "Error");
-    if (res.ok) router.refresh();
+    notify("Saving the decision…");
+    try {
+      const res = await decideSubmission(id, decision, note);
+      if (!res.ok) {
+        notify(res.error ?? "Could not save the decision.", "error");
+        return;
+      }
+      notify(`${label} successfully`);
+      router.refresh();
+    } catch {
+      notify("Could not save the decision. Try again.", "error");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -41,7 +52,7 @@ export function SubmissionActions({
       />
       <div className="flex flex-wrap gap-2">
         <Button disabled={loading} className="bg-green-600 text-white hover:bg-green-700" onClick={() => decide("approved")}>
-          Approve
+          {loading ? "Saving…" : "Approve"}
         </Button>
         <Button
           variant="secondary"
@@ -65,8 +76,17 @@ export function SubmissionActions({
             variant="outline"
             size="sm"
             onClick={async () => {
-              await updateSubmissionStatus(id, s, note);
-              setMsg(`Status: ${s}`);
+              try {
+                const result = await updateSubmissionStatus(id, s, note);
+                if (!result.ok) {
+                  notify("Could not update the status.", "error");
+                  return;
+                }
+                notify(`Marked as ${s}`);
+                router.refresh();
+              } catch {
+                notify("Could not update the status.", "error");
+              }
             }}
           >
             {s}
@@ -74,12 +94,11 @@ export function SubmissionActions({
         ))}
       </div>
       {type === "ptw_standard" && (
-        <RevalidationForm id={id} onDone={() => setMsg("Revalidated")} />
+        <RevalidationForm id={id} onDone={() => { notify("Revalidated"); router.refresh(); }} />
       )}
       {type === "gate_pass" && (
-        <GateLogForm id={id} onDone={() => setMsg("Gate log saved")} />
+        <GateLogForm id={id} onDone={() => { notify("Gate log saved"); router.refresh(); }} />
       )}
-      {msg && <p className="text-sm text-green-700">{msg}</p>}
     </div>
   );
 }

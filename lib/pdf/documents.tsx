@@ -41,9 +41,15 @@ export type PdfSubmission = {
 };
 
 function show(value: unknown) {
-  if (value == null || value === "") return "—";
-  if (Array.isArray(value)) return value.map(String).join(", ");
-  return String(value);
+  const raw = value == null || value === "" ? "-" : Array.isArray(value) ? value.map((item) => (item == null ? "" : String(item))).filter(Boolean).join(", ") : String(value);
+  return raw
+    .replace(/[\u2012\u2013\u2014\u2212]/g, "-")
+    .replace(/\u2265/g, ">=")
+    .replace(/\u2264/g, "<=")
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, "\"")
+    .replace(/\u00A0/g, " ")
+    .replace(/[^\x09\x0A\x0D\x20-\x7E]/g, "");
 }
 
 function Check({ on }: { on: boolean }) {
@@ -65,23 +71,23 @@ export function SubmissionPdf({ sub }: { sub: PdfSubmission }) {
         <View style={styles.header} fixed>
           <View style={{ width: 70 }}>{sub.logoDataUrl ? <Image src={sub.logoDataUrl} style={{ width: 48, height: 48 }} /> : <Text>SMA</Text>}</View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.title}>{form.title}</Text>
-            <Text style={styles.italic}>{form.reference}</Text>
+            <Text style={styles.title}>{show(form.title)}</Text>
+            <Text style={styles.italic}>{show(form.reference)}</Text>
           </View>
           <View style={{ width: 140, alignItems: "flex-end" }}>
             <Text style={styles.italic}>For Official Use Only</Text>
-            <Text style={{ fontFamily: "Helvetica-Bold" }}>{form.numberLabel} {sub.refNo}</Text>
+            <Text style={{ fontFamily: "Helvetica-Bold" }}>{show(form.numberLabel)} {show(sub.refNo)}</Text>
           </View>
         </View>
         <View style={styles.gold} fixed />
         <View style={styles.instructions}>
-          {form.instructions.map((line) => <Text key={line}>{line}</Text>)}
+          {form.instructions.map((line) => <Text key={line}>{show(line)}</Text>)}
         </View>
         {form.sections.filter((section) => section.id !== "approval").map((section) => (
           <View key={section.id} wrap>
             <View style={styles.section}>
-              <Text style={styles.sectionCode}>{section.code}</Text>
-              <Text style={styles.sectionTitle}>{section.title}</Text>
+              <Text style={styles.sectionCode}>{show(section.code)}</Text>
+              <Text style={styles.sectionTitle}>{show(section.title)}</Text>
             </View>
             {section.fields.map((field) => {
               if (field.type === "table" && (field.key === "workers" || field.key === "supervisor")) {
@@ -93,9 +99,9 @@ export function SubmissionPdf({ sub }: { sub: PdfSubmission }) {
                       ))}
                     </View>
                     {workers.map((worker, index) => (
-                      <View key={worker.emirates_id} style={{ flexDirection: "row" }}>
-                        {[String(index + 1), worker.full_name, worker.trade, worker.emirates_id, String(worker.eid_expiry).slice(0, 10), worker.mobile || ""].map((cell, cellIndex) => (
-                          <Text key={cellIndex} style={{ flex: 1, fontSize: 7, borderWidth: 0.5, borderColor: "#808080", padding: 2 }}>{cell}</Text>
+                      <View key={`${worker.emirates_id}-${index}`} style={{ flexDirection: "row" }}>
+                        {[String(index + 1), worker.full_name, worker.trade, worker.emirates_id, String(worker.eid_expiry || "").slice(0, 10), worker.mobile || ""].map((cell, cellIndex) => (
+                          <Text key={cellIndex} style={{ flex: 1, fontSize: 7, borderWidth: 0.5, borderColor: "#808080", padding: 2 }}>{show(cell)}</Text>
                         ))}
                       </View>
                     ))}
@@ -106,12 +112,12 @@ export function SubmissionPdf({ sub }: { sub: PdfSubmission }) {
                 const picked = selectedKeys(values[field.key], field.options || []);
                 return (
                   <View key={field.key} style={styles.checkRow}>
-                    <Text style={styles.label}>{field.label}</Text>
+                    <Text style={styles.label}>{show(field.label)}</Text>
                     <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 2 }}>
                       {(field.options || []).map((option) => (
                         <View key={option.key} style={{ flexDirection: "row", alignItems: "center", width: "48%", marginBottom: 2 }}>
                           <Check on={picked.includes(option.key)} />
-                          <Text>{option.label}</Text>
+                          <Text>{show(option.label)}</Text>
                         </View>
                       ))}
                     </View>
@@ -123,22 +129,22 @@ export function SubmissionPdf({ sub }: { sub: PdfSubmission }) {
                 return (
                   <View key={field.key} style={{ flexDirection: "row", borderWidth: 0.5, borderColor: "#808080", padding: 2 }}>
                     <Check on={match ? match.accepted : Boolean(values.declarantName)} />
-                    <Text style={{ flex: 1 }}>{field.label}</Text>
+                    <Text style={{ flex: 1 }}>{show(field.label)}</Text>
                   </View>
                 );
               }
               if (field.type === "signature") {
                 return (
                   <View key={field.key} style={styles.cell}>
-                    <Text style={styles.label}>Signature · {show(values.declarantName)}</Text>
-                    {sub.signatureDataUrl ? <Image src={sub.signatureDataUrl} style={{ width: 120, height: 36 }} /> : <Text>—</Text>}
+                    <Text style={styles.label}>Signature - {show(values.declarantName)}</Text>
+                    {sub.signatureDataUrl ? <Image src={sub.signatureDataUrl} style={{ width: 120, height: 36 }} /> : <Text>-</Text>}
                   </View>
                 );
               }
               if (field.type === "table" || field.type === "fileList") return null;
               return (
                 <View key={field.key} style={styles.cell}>
-                  <Text style={styles.label}>{field.label}</Text>
+                  <Text style={styles.label}>{show(field.label)}</Text>
                   <Text style={styles.value}>{show(values[field.key])}</Text>
                 </View>
               );
@@ -148,12 +154,12 @@ export function SubmissionPdf({ sub }: { sub: PdfSubmission }) {
         {sub.approved && (
           <View>
             <Text style={styles.stamp}>APPROVED</Text>
-            <Text>{sub.approved.adminName} · {sub.approved.signedAt}</Text>
-            {sub.approved.conditions ? <Text>Conditions: {sub.approved.conditions}</Text> : null}
+            <Text>{show(sub.approved.adminName)} - {show(sub.approved.signedAt)}</Text>
+            {sub.approved.conditions ? <Text>Conditions: {show(sub.approved.conditions)}</Text> : null}
             {sub.approved.qrDataUrl ? <Image src={sub.approved.qrDataUrl} style={{ width: 70, height: 70, marginTop: 4 }} /> : null}
           </View>
         )}
-        <Text style={styles.footer} fixed render={({ pageNumber, totalPages }) => `SMA e-Permit Portal · uncontrolled if printed · Page ${pageNumber} of ${totalPages}`} />
+        <Text style={styles.footer} fixed>SMA e-Permit Portal. Uncontrolled if printed.</Text>
       </Page>
       <Page size="A4" style={styles.page}>
         <View style={styles.section}>
@@ -162,21 +168,21 @@ export function SubmissionPdf({ sub }: { sub: PdfSubmission }) {
         </View>
         {form.hse.map((block) => (
           <View key={block.id} style={{ marginTop: 4 }}>
-            <Text style={{ backgroundColor: "#DCE6F3", fontFamily: "Helvetica-Bold", color: navy, padding: 2 }}>{block.id}) {block.title}</Text>
+            <Text style={{ backgroundColor: "#DCE6F3", fontFamily: "Helvetica-Bold", color: navy, padding: 2 }}>{show(block.id)}) {show(block.title)}</Text>
             {block.items.map((item) => (
               <View key={item} style={{ flexDirection: "row", marginTop: 1 }}>
                 <Check on />
-                <Text>{item}</Text>
+                <Text>{show(item)}</Text>
               </View>
             ))}
           </View>
         ))}
         <View style={{ flexDirection: "row", marginTop: 8 }}>
-          <Text style={{ backgroundColor: "#16a34a", color: "white", padding: 3, marginRight: 4 }}>GREEN TAG – Safe for use</Text>
-          <Text style={{ backgroundColor: "#fde047", padding: 3, marginRight: 4 }}>YELLOW TAG – Caution</Text>
-          <Text style={{ backgroundColor: "#dc2626", color: "white", padding: 3 }}>RED TAG – Do not use</Text>
+          <Text style={{ backgroundColor: "#16a34a", color: "white", padding: 3, marginRight: 4 }}>GREEN TAG - Safe for use</Text>
+          <Text style={{ backgroundColor: "#fde047", padding: 3, marginRight: 4 }}>YELLOW TAG - Caution</Text>
+          <Text style={{ backgroundColor: "#dc2626", color: "white", padding: 3 }}>RED TAG - Do not use</Text>
         </View>
-        <Text style={styles.footer} fixed render={({ pageNumber, totalPages }) => `SMA e-Permit Portal · uncontrolled if printed · Page ${pageNumber} of ${totalPages}`} />
+        <Text style={styles.footer} fixed>SMA e-Permit Portal. Uncontrolled if printed.</Text>
       </Page>
     </Document>
   );
