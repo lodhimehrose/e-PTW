@@ -5,7 +5,6 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -77,7 +76,6 @@ export function AdminLoginForm() {
             <p className="text-xs text-white/70">Khorfakkan, UAE</p>
           </div>
           </Link>
-          <ThemeToggle />
         </div>
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sma-gold">EHS officer access</p>
@@ -103,9 +101,6 @@ export function AdminLoginForm() {
                 <p className="text-sm font-semibold text-foreground">SMA e-Permit</p>
                 <p className="text-xs text-muted-foreground">EHS officer login</p>
               </div>
-            </div>
-            <div className="lg:hidden">
-              <ThemeToggle tone="onLight" />
             </div>
           </div>
           <h2 className="text-2xl font-bold text-foreground">Sign in</h2>

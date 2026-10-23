@@ -1,7 +1,5 @@
 import Link from "next/link";
 import Image from "next/image";
-import { ThemeToggle } from "@/components/theme-toggle";
-
 export function SiteShell({
   children,
   title,
@@ -30,7 +28,6 @@ export function SiteShell({
             </div>
           </Link>
           <nav className="flex shrink-0 items-center gap-2 text-sm">
-            <ThemeToggle />
             <Link href="/portal" className="hidden rounded-full px-3 py-1.5 text-white/80 hover:bg-white/10 sm:inline">
               My portal
             </Link>

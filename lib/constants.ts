@@ -38,7 +38,7 @@ export const VEHICLE_TYPES = [
   "Other",
 ] as const;
 
-export const EID_REGEX = /^784-\d{4}-\d{7}-\d$/;
+export const EID_REGEX = /^784-\d{11}-\d$/;
 
 export const MOBILE_REGEX = /^(05\d{8}|\+9715\d{8})$/;
 

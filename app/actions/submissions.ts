@@ -129,11 +129,16 @@ export async function submitForm(payload: SubmitPayload) {
 
   const supabase = createServiceClient();
   let ownerId: string | null = null;
+  let storedLicensePath = "";
+  let storedLicenseName = "Trade-license";
   try {
     const auth = await createAuthServerClient();
     const {
       data: { user },
     } = await auth.auth.getUser();
+    const meta = (user?.user_metadata ?? {}) as Record<string, string>;
+    storedLicensePath = meta.trade_license_path || "";
+    storedLicenseName = meta.trade_license_name || storedLicenseName;
     if (user) {
       ownerId = user.id;
       if (isAdminEmail(user.email)) {
@@ -220,6 +225,19 @@ export async function submitForm(payload: SubmitPayload) {
         console.error(uploadError);
         return { ok: false as const, error: `Could not save ${doc.name}. Try a smaller PDF, Word, Excel, or picture file.` };
       }
+    }
+  }
+
+  if (payload.data.useStoredTradeLicense && storedLicensePath) {
+    const dest = `${submissionId}/docs/trade-license`;
+    const copied = await supabase.storage.from("submissions").copy(storedLicensePath, dest);
+    if (!copied.error) {
+      await supabase.from("documents").insert({
+        submission_id: submissionId,
+        doc_type: "trade-license",
+        file_url: dest,
+        file_name: storedLicenseName,
+      });
     }
   }
 

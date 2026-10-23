@@ -7,7 +7,7 @@ export const workerSchema = z.object({
   tradeOther: z.string().optional(),
   emiratesId: z
     .string()
-    .regex(EID_REGEX, "Use format 784-XXXX-XXXXXXX-X"),
+    .regex(EID_REGEX, "Use format 784-XXXXXXXXXXX-X"),
   eidExpiry: z.string().min(1, "EID expiry is required"),
   mobile: z.string().regex(MOBILE_REGEX, "Mobile must be 10 digits, starting with 05"),
   inductionDone: z.enum(["yes", "no"]).optional(),
@@ -25,11 +25,13 @@ export function validateWorkersEidUnique(workers: WorkerInput[]) {
 
 export function formatEmiratesId(raw: string) {
   const digits = raw.replace(/\D/g, "").slice(0, 15);
-  if (!digits.startsWith("784")) return raw.replace(/[^\d-]/g, "").slice(0, 18);
-  const year = digits.slice(3, 7);
-  const serial = digits.slice(7, 14);
+  if (!digits) return "";
+  const head = digits.slice(0, 3);
+  const middle = digits.slice(3, 14);
   const check = digits.slice(14, 15);
-  return ["784", year, serial, check].filter(Boolean).join("-");
+  if (digits.length <= 3) return head;
+  if (!check) return `${head}-${middle}`;
+  return `${head}-${middle}-${check}`;
 }
 
 export function workerFieldError(worker: WorkerInput) {

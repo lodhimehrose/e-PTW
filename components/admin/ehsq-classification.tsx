@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { saveWorkClassification } from "@/app/actions/admin";
 import { CRITICAL_ACTIVITY, NORMAL_ACTIVITY, toggleItem } from "@/components/forms/work-scope-panel";
 import { CRITICAL_WORK_OPTIONS, LIGHT_WORK_OPTIONS } from "@/lib/forms/form-07";
+import { SAFETY_CONTROLS } from "@/lib/safety-controls";
 import { notify } from "@/components/notice-bar";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -20,16 +21,21 @@ export function EhsqClassification({
   workType,
   lightWorks,
   criticalWorks,
+  safetyControls,
+  showSafety,
 }: {
   id: string;
   workType: unknown;
   lightWorks: unknown;
   criticalWorks: unknown;
+  safetyControls?: unknown;
+  showSafety?: boolean;
 }) {
   const router = useRouter();
   const [activities, setActivities] = useState(asList(workType));
   const [light, setLight] = useState(asList(lightWorks));
   const [critical, setCritical] = useState(asList(criticalWorks));
+  const [safety, setSafety] = useState(asList(safetyControls));
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -39,6 +45,7 @@ export function EhsqClassification({
       workType: activities,
       lightWorks: activities.includes(NORMAL_ACTIVITY) ? light : [],
       criticalWorks: activities.includes(CRITICAL_ACTIVITY) ? critical : [],
+      safetyControls: safety,
     });
     setSaving(false);
     setMessage(result.ok ? "Classification saved on the permit." : result.error);
@@ -84,6 +91,20 @@ export function EhsqClassification({
           )}
         </div>
       </div>
+      {showSafety && (
+        <div className="mt-4">
+          <h4 className="font-medium text-foreground">Safety requirements</h4>
+          <p className="mb-2 text-sm text-muted-foreground">Set by EHSQ. Contractors do not fill this section.</p>
+          <div className="grid gap-2">
+            {SAFETY_CONTROLS.map((item) => (
+              <label key={item} className="flex items-start gap-2 text-sm">
+                <Checkbox checked={safety.includes(item)} onCheckedChange={() => setSafety((current) => toggleItem(current, item))} className="mt-0.5" />
+                {item}
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
       <Button type="button" className="mt-4" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save classification"}</Button>
       {message && <p className="mt-2 text-sm">{message}</p>}
     </section>

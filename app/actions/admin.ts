@@ -375,7 +375,7 @@ export async function issueGatePass(
 
 export async function saveWorkClassification(
   id: string,
-  input: { workType: string[]; lightWorks: string[]; criticalWorks: string[] },
+  input: { workType: string[]; lightWorks: string[]; criticalWorks: string[]; safetyControls?: string[] },
 ) {
   const { user } = await requireAdmin();
   const supabase = createServiceClient();
@@ -389,6 +389,7 @@ export async function saveWorkClassification(
         workType: input.workType,
         lightWorks: input.lightWorks,
         criticalWorks: input.criticalWorks,
+        safetyControls: input.safetyControls ?? [],
       },
       updated_at: new Date().toISOString(),
     })

@@ -3,38 +3,8 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
-    --background: 38 46% 93%;
-    --foreground: 215 58% 16%;
-    --card: 40 55% 97%;
-    --card-foreground: 215 58% 16%;
-    --primary: 215 58% 18%;
-    --primary-foreground: 40 45% 96%;
-    --muted: 38 32% 88%;
-    --muted-foreground: 215 16% 34%;
-    --accent: 42 46% 48%;
-    --accent-foreground: 215 58% 16%;
-    --border: 36 24% 82%;
-    --input: 36 24% 82%;
-    --ring: 215 58% 18%;
-  }
-
-  .dark {
-    --background: 216 42% 9%;
-    --foreground: 40 42% 93%;
-    --card: 216 34% 14%;
-    --card-foreground: 40 42% 93%;
-    --primary: 40 42% 93%;
-    --primary-foreground: 216 42% 10%;
-    --muted: 216 24% 18%;
-    --muted-foreground: 38 18% 72%;
-    --accent: 42 46% 48%;
-    --accent-foreground: 40 45% 96%;
-    --border: 216 20% 24%;
-    --input: 216 20% 24%;
-    --ring: 42 46% 48%;
-  }
-
+  :root,
+  .dark,
   .midnight {
     --background: 272 48% 10%;
     --foreground: 270 40% 96%;
@@ -51,21 +21,43 @@
     --ring: 282 72% 68%;
   }
 
-  html.midnight body,
-  html.midnight .bg-background {
+  body {
     background-color: #14081f;
     background-image: linear-gradient(165deg, #2a0a4a 0%, #12081c 42%, #3a1468 100%);
     background-attachment: fixed;
+    color: hsl(var(--foreground));
+    -webkit-font-smoothing: antialiased;
   }
 
-  body {
-    @apply bg-background text-foreground antialiased;
+  body::before {
+    content: "";
+    position: fixed;
+    left: 50%;
+    top: 46%;
+    z-index: 0;
+    width: min(78vw, 560px);
+    height: min(78vw, 560px);
+    transform: translate(-50%, -50%);
+    background: url("/sma-logo.jpg") center / contain no-repeat;
+    opacity: 0.16;
+    pointer-events: none;
+  }
+
+  body > * {
+    position: relative;
+    z-index: 1;
   }
 }
 
 @layer utilities {
-  .bg-white {
-    background-color: hsl(var(--card));
+  .bg-white,
+  .bg-card {
+    background-color: hsl(var(--card) / 0.62);
+    backdrop-filter: blur(8px);
+  }
+
+  .bg-background {
+    background-color: transparent;
   }
 
   .dark .text-sma-navy {

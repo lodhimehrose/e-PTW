@@ -62,7 +62,16 @@ export async function middleware(request: NextRequest) {
 
   if (isPortalAuth && user && email !== adminEmail) {
     const url = request.nextUrl.clone();
-    url.pathname = "/portal";
+    const next = request.nextUrl.searchParams.get("next");
+    url.pathname = next?.startsWith("/") ? next : "/portal";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
+  if (path === "/ptw/standard" && !user) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/portal/signup";
+    url.searchParams.set("next", "/ptw/standard");
     return NextResponse.redirect(url);
   }
 
@@ -70,5 +79,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/portal/:path*"],
+  matcher: ["/admin/:path*", "/portal/:path*", "/ptw/standard"],
 };

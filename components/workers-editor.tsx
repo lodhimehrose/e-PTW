@@ -122,7 +122,7 @@ export function WorkersEditor({ workers, onChange, errors, savedWorkers = [] }: 
               <Label>Emirates ID *</Label>
               <Input
                 value={w.emiratesId}
-                placeholder="784-XXXX-XXXXXXX-X"
+                placeholder="784-XXXXXXXXXXX-X"
                 onChange={(e) => update(i, { emiratesId: formatEmiratesId(e.target.value) })}
               />
             </div>

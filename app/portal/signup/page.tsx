@@ -2,88 +2,84 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { registerContractor } from "@/app/actions/account";
 import { SiteShell } from "@/components/site-shell";
 import { Button } from "@/components/ui/button";
+import { FileUploadField } from "@/components/file-upload-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
-const adminEmail = (
-  process.env.NEXT_PUBLIC_ADMIN_EMAIL ?? "lodhimehrose@gmail.com"
-).toLowerCase();
+import type { FilePayload } from "@/app/actions/submissions";
 
 export default function PortalSignupPage() {
-  const router = useRouter();
-  const [name, setName] = useState("");
   const [company, setCompany] = useState("");
+  const [licenseNo, setLicenseNo] = useState("");
+  const [licenseExpiry, setLicenseExpiry] = useState("");
+  const [licenseFile, setLicenseFile] = useState<FilePayload | undefined>();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function onSubmit(event: React.FormEvent) {
+    event.preventDefault();
     setLoading(true);
     setError("");
     setNotice("");
-    if (email.toLowerCase() === adminEmail) {
-      setError("This email is reserved for the EHS officer.");
-      setLoading(false);
-      return;
-    }
-    if (password.length < 6) {
-      setError("Use at least 6 characters for the password.");
-      setLoading(false);
-      return;
-    }
-    const supabase = createClient();
-    const { data, error: err } = await supabase.auth.signUp({
+    const nextPath = new URLSearchParams(window.location.search).get("next") || "/portal";
+    const result = await registerContractor({
+      companyName: company,
+      tradeLicenseNo: licenseNo,
+      tradeLicenseExpiry: licenseExpiry,
       email,
       password,
-      options: {
-        data: { full_name: name, company_name: company },
-        emailRedirectTo: `${window.location.origin}/portal`,
-      },
+      tradeLicense: licenseFile || { name: "", type: "", base64: "" },
+      nextPath,
     });
     setLoading(false);
-    if (err) {
-      setError(err.message);
+    if (!result.ok) {
+      setError(result.error);
       return;
     }
-    if (!data.session) {
-      setNotice("Account created. Confirm the email from Supabase, then sign in.");
-      return;
-    }
-    router.push("/portal");
-    router.refresh();
+    setNotice(result.notice);
   }
 
   return (
     <SiteShell title="Create a contractor account">
       <form onSubmit={onSubmit} className="mx-auto max-w-md space-y-4 rounded-3xl bg-card p-8 shadow-sm ring-1 ring-border">
         <p className="text-sm text-muted-foreground">
-          Use this account to submit gate passes and permits, then track them in one place.
+          Use this account to submit permits, then track them in one place. A verification email opens on this portal.
         </p>
         <div>
-          <Label>Full name</Label>
-          <Input value={name} onChange={(e) => setName(e.target.value)} required />
-        </div>
-        <div>
-          <Label>Company</Label>
+          <Label>Company name</Label>
           <Input value={company} onChange={(e) => setCompany(e.target.value)} required />
         </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <Label>Trade license no.</Label>
+            <Input value={licenseNo} onChange={(e) => setLicenseNo(e.target.value)} required />
+          </div>
+          <div>
+            <Label>Trade license expiry</Label>
+            <Input type="date" value={licenseExpiry} onChange={(e) => setLicenseExpiry(e.target.value)} required />
+          </div>
+        </div>
+        <FileUploadField
+          label="Trade license"
+          files={licenseFile ? [licenseFile] : []}
+          onChange={(files) => setLicenseFile(files[0])}
+          required
+        />
         <div>
           <Label>Email</Label>
           <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
         </div>
         <div>
-          <Label>Password</Label>
+          <Label>Set password</Label>
           <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="new-password" />
         </div>
-        {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-        {notice && <p className="rounded-lg bg-muted px-3 py-2 text-sm text-foreground">{notice}</p>}
+        {error && <p className="rounded-lg bg-red-600/90 px-3 py-2 text-sm text-white">{error}</p>}
+        {notice && <p className="rounded-lg bg-green-700/90 px-3 py-2 text-sm text-white">{notice}</p>}
         <Button type="submit" className="w-full" disabled={loading}>
           {loading ? "Creating account…" : "Create account"}
         </Button>

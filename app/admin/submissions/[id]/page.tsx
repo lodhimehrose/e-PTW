@@ -217,6 +217,8 @@ export default async function SubmissionDetailPage({
           workType={data.workType}
           lightWorks={data.lightWorks}
           criticalWorks={data.criticalWorks}
+          safetyControls={data.safetyControls}
+          showSafety={sub.type === "ptw_emergency"}
         />
       )}
 

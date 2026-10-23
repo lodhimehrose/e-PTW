@@ -4,8 +4,6 @@ import { usePathname } from "next/navigation";
 import { AdminSidebar } from "./sidebar";
 import { AccountSwitcher } from "./account-switcher";
 import { SignOutButton } from "@/components/sign-out-button";
-import { ThemeToggle } from "@/components/theme-toggle";
-
 export function AdminShell({
   children,
   accounts,
@@ -27,7 +25,6 @@ export function AdminShell({
             <SignOutButton redirectTo="/admin/login" />
           </div>
           <AccountSwitcher accounts={accounts} />
-          <ThemeToggle tone="onLight" />
         </div>
         <div className="flex-1 p-4 md:p-8">{children}</div>
       </div>
