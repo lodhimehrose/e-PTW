@@ -16,7 +16,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={`${inter.variable} font-sans`}>
         <script
           dangerouslySetInnerHTML={{
-            __html: `document.documentElement.classList.add("dark","midnight");try{localStorage.setItem("sma-theme","midnight")}catch(e){}`,
+            __html: `document.documentElement.classList.remove("dark","midnight");try{localStorage.setItem("sma-theme","light")}catch(e){}`,
           }}
         />
         <NoticeBar />

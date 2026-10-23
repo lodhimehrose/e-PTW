@@ -12,10 +12,12 @@ import { SignaturePadField } from "@/components/signature-pad";
 import { FileUploadField } from "@/components/file-upload-field";
 import { submitForm, type FilePayload } from "@/app/actions/submissions";
 import { loadAccountProfile } from "@/app/actions/account";
+import { loadRoster, type SavedWorker } from "@/app/actions/roster";
 import { formatEmiratesId, workerFieldError, validateEidAfterWorkEnd, type WorkerInput } from "@/lib/validations/worker";
 import { SECTION_IV_UNDERTAKINGS } from "@/lib/constants";
 import { EMERGENCY_RISKS, SAFETY_CONTROLS } from "@/lib/safety-controls";
 import { notify } from "@/components/notice-bar";
+import { PeopleOnFile } from "@/components/people-on-file";
 
 type Draft = {
   risks: string[];
@@ -72,6 +74,7 @@ export function PtwEmergencyForm() {
   const [data, setData] = useState<Draft>(initial);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [savedPeople, setSavedPeople] = useState<SavedWorker[]>([]);
   const once = useRef(false);
   const supervisor = data.workers[0];
 
@@ -82,16 +85,17 @@ export function PtwEmergencyForm() {
   useEffect(() => {
     if (once.current) return;
     once.current = true;
-    loadAccountProfile().then((profile) => {
-      if (!profile) return;
+    Promise.all([loadAccountProfile(), loadRoster()]).then(([profile, roster]) => {
+      setSavedPeople(roster.workers);
+      if (!profile && !roster.company) return;
       setData((current) => ({
         ...current,
-        companyName: profile.companyName || current.companyName,
-        tradeLicenseNo: profile.tradeLicenseNo || current.tradeLicenseNo,
-        tradeLicenseExpiry: profile.tradeLicenseExpiry || current.tradeLicenseExpiry,
-        contactEmail: profile.email || current.contactEmail,
-        storedLicenseNames: profile.tradeLicenseNames,
-        storedLicensePaths: profile.tradeLicensePaths,
+        companyName: profile?.companyName || roster.company?.companyName || current.companyName,
+        tradeLicenseNo: profile?.tradeLicenseNo || roster.company?.tradeLicenseNo || current.tradeLicenseNo,
+        tradeLicenseExpiry: profile?.tradeLicenseExpiry || current.tradeLicenseExpiry,
+        contactEmail: profile?.email || roster.company?.contactEmail || current.contactEmail,
+        storedLicenseNames: profile?.tradeLicenseNames ?? [],
+        storedLicensePaths: profile?.tradeLicensePaths ?? [],
       }));
     });
   }, []);
@@ -153,6 +157,7 @@ export function PtwEmergencyForm() {
         tradeLicenseNo: data.tradeLicenseNo,
         tradeLicenseExpiry: data.tradeLicenseExpiry,
         storedTradeLicensePaths: data.storedLicensePaths,
+        storedEidCopies: supervisor.eidCopy || !supervisor.storedEidPath ? [] : [{ path: supervisor.storedEidPath, name: supervisor.storedEidName || "Emirates ID" }],
         declarantName: data.declarantName,
         declarantDesignation: data.declarantDesignation,
         validFrom: data.validFrom,
@@ -265,6 +270,28 @@ export function PtwEmergencyForm() {
             <Label>Emirates ID *</Label>
             <Input placeholder="784-XXXXXXXXXXX-X" value={supervisor.emiratesId} onChange={(event) => setSupervisor({ emiratesId: formatEmiratesId(event.target.value) })} />
           </div>
+          <div className="md:col-span-2">
+            <PeopleOnFile
+              people={savedPeople}
+              selectedIds={[supervisor.emiratesId]}
+              onPick={(person, checked) => {
+                if (!checked) {
+                  setSupervisor({ fullName: "", trade: "Supervisor", emiratesId: "", eidExpiry: "", mobile: "", storedEidPath: "", storedEidName: "", eidCopy: undefined });
+                  return;
+                }
+                setSupervisor({
+                  fullName: person.fullName,
+                  trade: person.trade || "Supervisor",
+                  emiratesId: formatEmiratesId(person.emiratesId),
+                  eidExpiry: person.eidExpiry,
+                  mobile: person.mobile.replace(/\D/g, "").slice(0, 10),
+                  storedEidPath: person.eidFilePath,
+                  storedEidName: person.eidFileName,
+                  eidCopy: undefined,
+                });
+              }}
+            />
+          </div>
           <div>
             <Label>EID expiry *</Label>
             <Input type="date" value={supervisor.eidExpiry} onChange={(event) => setSupervisor({ eidExpiry: event.target.value })} />
@@ -274,7 +301,10 @@ export function PtwEmergencyForm() {
             <Input inputMode="numeric" maxLength={10} placeholder="05XXXXXXXX" value={supervisor.mobile} onChange={(event) => setSupervisor({ mobile: event.target.value.replace(/\D/g, "").slice(0, 10) })} />
           </div>
           <div className="md:col-span-2">
-            <FileUploadField label="Emirates ID copy" files={supervisor.eidCopy ? [supervisor.eidCopy] : []} onChange={(files) => setSupervisor({ eidCopy: files[0] })} />
+            {supervisor.storedEidName && !supervisor.eidCopy && (
+              <p className="mb-2 text-sm text-green-700">Emirates ID already on file: {supervisor.storedEidName}</p>
+            )}
+            <FileUploadField label="Emirates ID copy" files={supervisor.eidCopy ? [supervisor.eidCopy] : []} onChange={(files) => setSupervisor({ eidCopy: files[0], storedEidPath: files[0] ? "" : supervisor.storedEidPath, storedEidName: files[0] ? "" : supervisor.storedEidName })} />
           </div>
         </div>
         <FieldError message={errors.worker} />

@@ -161,29 +161,6 @@ export function SubmissionPdf({ sub }: { sub: PdfSubmission }) {
         )}
         <Text style={styles.footer} fixed>SMA e-Permit Portal. Uncontrolled if printed.</Text>
       </Page>
-      <Page size="A4" style={styles.page}>
-        <View style={styles.section}>
-          <Text style={styles.sectionCode}>SECTION VI</Text>
-          <Text style={styles.sectionTitle}>HEALTH, SAFETY AND ENVIRONMENT REQUIREMENTS</Text>
-        </View>
-        {form.hse.map((block) => (
-          <View key={block.id} style={{ marginTop: 4 }}>
-            <Text style={{ backgroundColor: "#DCE6F3", fontFamily: "Helvetica-Bold", color: navy, padding: 2 }}>{show(block.id)}) {show(block.title)}</Text>
-            {block.items.map((item) => (
-              <View key={item} style={{ flexDirection: "row", marginTop: 1 }}>
-                <Check on />
-                <Text>{show(item)}</Text>
-              </View>
-            ))}
-          </View>
-        ))}
-        <View style={{ flexDirection: "row", marginTop: 8 }}>
-          <Text style={{ backgroundColor: "#16a34a", color: "white", padding: 3, marginRight: 4 }}>GREEN TAG - Safe for use</Text>
-          <Text style={{ backgroundColor: "#fde047", padding: 3, marginRight: 4 }}>YELLOW TAG - Caution</Text>
-          <Text style={{ backgroundColor: "#dc2626", color: "white", padding: 3 }}>RED TAG - Do not use</Text>
-        </View>
-        <Text style={styles.footer} fixed>SMA e-Permit Portal. Uncontrolled if printed.</Text>
-      </Page>
     </Document>
   );
 }

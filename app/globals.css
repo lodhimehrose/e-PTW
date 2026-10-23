@@ -3,8 +3,38 @@
 @tailwind utilities;
 
 @layer base {
-  :root,
-  .dark,
+  :root {
+    --background: 40 56% 95%;
+    --foreground: 215 48% 16%;
+    --card: 42 70% 98%;
+    --card-foreground: 215 48% 16%;
+    --primary: 215 62% 18%;
+    --primary-foreground: 40 56% 97%;
+    --muted: 40 36% 91%;
+    --muted-foreground: 215 16% 32%;
+    --accent: 42 72% 86%;
+    --accent-foreground: 215 48% 16%;
+    --border: 38 28% 76%;
+    --input: 38 28% 76%;
+    --ring: 42 42% 40%;
+  }
+
+  .dark {
+    --background: 222 40% 8%;
+    --foreground: 40 30% 96%;
+    --card: 222 32% 12%;
+    --card-foreground: 40 30% 96%;
+    --primary: 42 55% 62%;
+    --primary-foreground: 222 40% 8%;
+    --muted: 222 24% 18%;
+    --muted-foreground: 40 16% 78%;
+    --accent: 222 24% 20%;
+    --accent-foreground: 40 30% 96%;
+    --border: 222 18% 24%;
+    --input: 222 18% 24%;
+    --ring: 42 55% 62%;
+  }
+
   .midnight {
     --background: 272 48% 10%;
     --foreground: 270 40% 96%;
@@ -22,13 +52,18 @@
   }
 
   body {
+    background-color: #f6efe0;
+    background-image: linear-gradient(180deg, #fff8ec 0%, #f3e6cf 100%);
+    background-attachment: fixed;
+    color: hsl(var(--foreground));
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .midnight body {
     background-color: #14081f;
     background-image:
       radial-gradient(circle at 50% 46%, rgba(255, 248, 232, 0.72) 0, rgba(255, 248, 232, 0.28) 180px, transparent 460px),
       linear-gradient(165deg, #2a0a4a 0%, #12081c 42%, #3a1468 100%);
-    background-attachment: fixed;
-    color: hsl(var(--foreground));
-    -webkit-font-smoothing: antialiased;
   }
 
   body::before {
@@ -41,25 +76,62 @@
     height: min(78vw, 560px);
     transform: translate(-50%, -50%);
     background: url("/sma-logo.jpg") center / contain no-repeat;
+    opacity: 0.22;
+    pointer-events: none;
+  }
+
+  .midnight body::before {
     opacity: 0.72;
     filter: drop-shadow(0 0 18px rgba(255, 248, 232, 0.85));
-    pointer-events: none;
   }
 
   body > * {
     position: relative;
     z-index: 1;
   }
+
+  a[href],
+  button:not(:disabled),
+  label,
+  summary,
+  select,
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"],
+  [role="menuitem"],
+  [role="option"],
+  [role="checkbox"]:not([data-disabled]),
+  [role="radio"],
+  [role="switch"],
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled),
+  input[type="file"],
+  input[type="submit"]:not(:disabled),
+  input[type="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  input:disabled,
+  select:disabled,
+  [aria-disabled="true"],
+  [data-disabled] {
+    cursor: not-allowed;
+  }
+
+  input[type="checkbox"],
+  input[type="radio"] {
+    accent-color: #16a34a;
+  }
 }
 
 @layer utilities {
-  .bg-white,
-  .bg-card {
+  .midnight .bg-white,
+  .midnight .bg-card {
     background-color: hsl(var(--card) / 0.62);
     backdrop-filter: blur(8px);
   }
 
-  .bg-background {
+  .midnight .bg-background {
     background-color: transparent;
   }
 
@@ -91,5 +163,17 @@
 
   .official-form .official-fields > * {
     grid-column: 1 / -1 !important;
+  }
+}
+
+.hse-admin-page {
+  break-before: page;
+  margin-top: 2rem;
+}
+
+@media print {
+  .hse-admin-page,
+  body::before {
+    display: none !important;
   }
 }

@@ -210,6 +210,9 @@ export function PtwStandardForm() {
         tradeLicenseNo: data.tradeLicenseNo,
         tradeLicenseExpiry: data.tradeLicenseExpiry,
         storedTradeLicensePaths: data.storedLicensePaths,
+        storedEidCopies: attending
+          .filter((worker) => worker.storedEidPath && !worker.eidCopy)
+          .map((worker) => ({ path: worker.storedEidPath, name: worker.storedEidName || `EID-${worker.fullName}` })),
         supervisorName: data.supervisorName,
         supervisorPhone: data.supervisorPhone,
         workDescription: data.workDescription,
@@ -261,6 +264,8 @@ export function PtwStandardForm() {
         eidExpiry: worker.eidExpiry,
         mobile: worker.mobile.replace(/\D/g, "").slice(0, 10),
         inductionDone: "no" as const,
+        storedEidPath: worker.eidFilePath,
+        storedEidName: worker.eidFileName,
       })),
     });
   }

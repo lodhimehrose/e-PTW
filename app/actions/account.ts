@@ -53,13 +53,11 @@ export async function loadAccountProfile(): Promise<AccountProfile | null> {
       admin.from("submissions").select(columns).eq("owner_id", user.id).order("created_at", { ascending: false }).limit(8),
       admin.from("submissions").select(columns).eq("contact_email", user.email).order("created_at", { ascending: false }).limit(8),
     ];
-    if (companyName) {
-      lookups.push(admin.from("submissions").select(columns).eq("company_name", companyName).order("created_at", { ascending: false }).limit(8));
-    }
     const found = await Promise.all(lookups);
     const seen = new Set<string>();
     const rows = found.flatMap((result) => result.data ?? []).filter((row) => {
       if (!row.id || seen.has(row.id)) return false;
+      if (companyName && String(row.company_name || "").trim().toLowerCase() !== companyName.trim().toLowerCase()) return false;
       seen.add(row.id);
       return true;
     });

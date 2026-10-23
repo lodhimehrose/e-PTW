@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { ThemeToggle } from "@/components/theme-toggle";
 export function SiteShell({
   children,
   title,
@@ -31,6 +32,7 @@ export function SiteShell({
             <Link href="/portal" className="hidden rounded-full px-3 py-1.5 text-white/80 hover:bg-white/10 sm:inline">
               My portal
             </Link>
+            <ThemeToggle />
             <Link href="/admin/login" className="rounded-full bg-sma-gold px-3 py-1.5 font-medium text-sma-navy">
               EHS login
             </Link>

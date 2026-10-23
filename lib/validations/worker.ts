@@ -14,6 +14,8 @@ export const workerSchema = z.object({
   eidCopy: z
     .object({ name: z.string(), type: z.string(), base64: z.string() })
     .optional(),
+  storedEidPath: z.string().optional(),
+  storedEidName: z.string().optional(),
 });
 
 export type WorkerInput = z.infer<typeof workerSchema>;

@@ -228,6 +228,23 @@ export async function submitForm(payload: SubmitPayload) {
     }
   }
 
+  const storedEids = Array.isArray(payload.data.storedEidCopies) ? payload.data.storedEidCopies : [];
+  for (const copy of storedEids) {
+    const source = copy && typeof copy === "object" ? String((copy as { path?: string }).path || "") : "";
+    const name = copy && typeof copy === "object" ? String((copy as { name?: string }).name || "Emirates ID") : "Emirates ID";
+    if (!source) continue;
+    const dest = `${submissionId}/docs/${randomUUID()}-emirates-id`;
+    const copied = await supabase.storage.from("submissions").copy(source, dest);
+    if (!copied.error) {
+      await supabase.from("documents").insert({
+        submission_id: submissionId,
+        doc_type: "emirates-id",
+        file_url: dest,
+        file_name: name,
+      });
+    }
+  }
+
   const storedPaths = Array.isArray(payload.data.storedTradeLicensePaths)
     ? payload.data.storedTradeLicensePaths.map(String).filter(Boolean)
     : storedLicensePath && payload.data.useStoredTradeLicense

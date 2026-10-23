@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { AdminSidebar } from "./sidebar";
 import { AccountSwitcher } from "./account-switcher";
 import { SignOutButton } from "@/components/sign-out-button";
+import { ThemeToggle } from "@/components/theme-toggle";
 export function AdminShell({
   children,
   accounts,
@@ -22,6 +23,7 @@ export function AdminShell({
         <div className="space-y-3 border-b border-border px-4 py-3 md:hidden">
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-semibold text-foreground">SMA Admin</p>
+            <ThemeToggle tone="onLight" />
             <SignOutButton redirectTo="/admin/login" />
           </div>
           <AccountSwitcher accounts={accounts} />

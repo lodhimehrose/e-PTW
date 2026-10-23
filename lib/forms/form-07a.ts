@@ -18,13 +18,10 @@ export const form07a: FormDefinition = {
       code: "SECTION I",
       title: "EMERGENCY / BREAKDOWN DETAILS",
       fields: [
-        { key: "description", label: "Description of the breakdown / emergency", type: "textarea", span: 24 },
         { key: "risks", label: "Immediate risk if not attended", type: "checkboxGroup", span: 24, options: optionList(["Safety of people", "Fire / life safety", "Water leak / flooding", "Power failure", "Person trapped in lift", "Security breach", "Critical SMA operations", "Others"]) },
         { key: "companyName", label: "Company Name", type: "text", span: 12 },
         { key: "tradeLicenseNo", label: "Trade License No.", type: "text", span: 6 },
         { key: "tradeLicenseExpiry", label: "License Expiry", type: "date", span: 6 },
-        { key: "reportedBy", label: "Reported by", type: "text", span: 12 },
-        { key: "department", label: "SMA Requesting Dept.", type: "text", span: 12 },
         { key: "building", label: "Building / Location", type: "text", span: 12 },
         { key: "contactEmail", label: "Contact email", type: "text", span: 12 },
       ],

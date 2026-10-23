@@ -16,8 +16,8 @@ function text(value: unknown) {
 
 function Box({ on }: { on: boolean }) {
   return (
-    <span className="mr-1 inline-flex h-3.5 w-3.5 items-center justify-center border border-slate-700 text-[9px] font-bold leading-none text-slate-900">
-      {on ? "X" : ""}
+    <span className={`mr-1 inline-flex h-3.5 w-3.5 items-center justify-center border text-[10px] font-bold leading-none ${on ? "border-green-600 bg-green-600 text-white" : "border-slate-700 bg-white text-slate-900"}`}>
+      {on ? "✓" : ""}
     </span>
   );
 }
@@ -201,16 +201,20 @@ export function OfficialFormView({
         ))}
 
         {form.hse.length > 0 && (
-          <section>
+          <section className="hse-admin-page">
             <div className="grid grid-cols-[120px_1fr] bg-[#13294B] text-white">
               <p className="px-2 py-1 text-[11px] font-bold">SECTION VI</p>
               <p className="px-2 py-1 text-[11px] font-bold">HEALTH, SAFETY AND ENVIRONMENT REQUIREMENTS</p>
             </div>
+            <p className="border border-[#808080] bg-[#FFF8E8] px-2 py-1 text-[11px] text-[#13294B]">For the EHS officer. This page is not included when the permit is printed.</p>
             {form.hse.map((block) => (
               <div key={block.id} className="border border-[#808080] p-2">
                 <p className="bg-[#DCE6F3] px-2 py-1 text-[11px] font-bold text-[#13294B]">{block.id}) {block.title}</p>
                 <ul className="mt-1 space-y-0.5 text-[11px] text-slate-900">
-                  {block.items.map((item) => <li key={item}><Box on /> {item}</li>)}
+                  {block.items.map((item) => {
+                    const picked = selectedKeys(data.hseAccepted ?? data.safetyControls, block.items.map((entry) => ({ key: entry, label: entry })));
+                    return <li key={item}><Box on={picked.includes(item)} /> {item}</li>;
+                  })}
                 </ul>
               </div>
             ))}

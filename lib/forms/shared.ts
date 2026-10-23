@@ -59,8 +59,8 @@ export function optionList(labels: string[]): FormOption[] {
 }
 
 export function selectedKeys(value: unknown, options: FormOption[]) {
-  const raw = Array.isArray(value) ? value.map(String) : typeof value === "string" && value ? [value] : [];
-  const chosen = new Set(raw.map((item) => item.toLowerCase()));
+  const raw = Array.isArray(value) ? value.map(String) : typeof value === "string" && value ? value.split(",") : [];
+  const chosen = new Set(raw.map((item) => item.trim().toLowerCase()).filter(Boolean));
   return options.filter(
     (option) => chosen.has(option.key.toLowerCase()) || chosen.has(option.label.toLowerCase()),
   ).map((option) => option.key);

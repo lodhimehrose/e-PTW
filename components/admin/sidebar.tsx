@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { LayoutDashboard, FileText, Search, QrCode, Settings } from "lucide-react";
 import { SignOutButton } from "@/components/sign-out-button";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { AccountSwitcher } from "./account-switcher";
 
 const links = [
@@ -26,6 +27,7 @@ export function AdminSidebar({
           <p className="text-xs text-muted-foreground">EHS Officer</p>
         </div>
       </div>
+      <div className="px-3 pt-3"><ThemeToggle tone="onLight" /></div>
       <AccountSwitcher accounts={accounts} />
       <nav className="flex-1 space-y-1 p-3">
         {links.map((l) => (
