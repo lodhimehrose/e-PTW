@@ -228,15 +228,21 @@ export async function submitForm(payload: SubmitPayload) {
     }
   }
 
-  if (payload.data.useStoredTradeLicense && storedLicensePath) {
-    const dest = `${submissionId}/docs/trade-license`;
-    const copied = await supabase.storage.from("submissions").copy(storedLicensePath, dest);
+  const storedPaths = Array.isArray(payload.data.storedTradeLicensePaths)
+    ? payload.data.storedTradeLicensePaths.map(String).filter(Boolean)
+    : storedLicensePath && payload.data.useStoredTradeLicense
+      ? [storedLicensePath]
+      : [];
+  for (let index = 0; index < storedPaths.length; index += 1) {
+    const source = storedPaths[index];
+    const dest = `${submissionId}/docs/${randomUUID()}-trade-license`;
+    const copied = await supabase.storage.from("submissions").copy(source, dest);
     if (!copied.error) {
       await supabase.from("documents").insert({
         submission_id: submissionId,
         doc_type: "trade-license",
         file_url: dest,
-        file_name: storedLicenseName,
+        file_name: storedLicenseName || `Trade license ${index + 1}`,
       });
     }
   }
@@ -352,53 +358,33 @@ export async function submitForm(payload: SubmitPayload) {
     ? `<p>A ${payload.type === "ptw_emergency" ? "emergency" : "contractor"} gate pass <strong>${gateRef}</strong> was created from these details. It is approved when this permit is approved.</p>`
     : "";
 
-  await sendEmail({
-    to: payload.contactEmail,
-    subject: `${urgent}We received your ${formName} – Ref ${refNo}`,
-    html: `<p>Thank you. Your submission <strong>${refNo}</strong> is <strong>Pending</strong> review.</p>
+  const mailed = await sendEmail({
+    to: EHS_INBOX,
+    subject: `${urgent}New ${formName} – ${payload.companyName} – ${refNo}`,
+    html: `<p><strong>${payload.companyName}</strong> submitted a ${formName}.</p>
+      <p>Reference: <strong>${refNo}</strong></p>
       ${gateLine}
+      <p>Contact: ${payload.contactEmail}</p>
+      <p>Location: ${payload.building ?? "—"}</p>
+      <p>Workers: ${workers?.length ?? 0}</p>
+      <p><a href="${site}/admin/submissions/${submissionId}">Open this submission</a></p>
       <p><a href="${site}/api/pdf/${refNo}?token=${verifyToken}">Download the form PDF</a></p>`,
   });
-
-  const { data: settings } = await supabase
-    .from("settings")
-    .select("gate_pass_recipients, ptw_standard_recipients, ptw_emergency_recipients")
-    .limit(1)
-    .maybeSingle();
-  const configured =
-    payload.type === "gate_pass"
-      ? settings?.gate_pass_recipients
-      : payload.type === "ptw_emergency"
-        ? settings?.ptw_emergency_recipients
-        : settings?.ptw_standard_recipients;
-  const receivers = uniqueEmails([
-    EHS_INBOX,
-    process.env.ADMIN_EMAIL,
-    ...splitEmails(configured),
-  ]);
-  if (receivers.length) {
-    await sendEmail({
-      to: receivers,
-      subject: `${urgent}New ${formName} – ${payload.companyName} – ${refNo}`,
-      html: `<p><strong>${payload.companyName}</strong> submitted a ${formName}.</p>
-        <p>Reference: <strong>${refNo}</strong></p>
-        ${gateRef ? `<p>Gate pass: <strong>${gateRef}</strong> (draft, editable before approval)</p>` : ""}
-        <p>Contact: ${payload.contactEmail}</p>
-        <p>Location: ${payload.building ?? "—"}</p>
-        <p>Workers: ${workers?.length ?? 0}</p>
-        <p><a href="${site}/admin/submissions/${submissionId}">Open this submission</a></p>`,
-    });
-  }
+  const emailWarning = mailed.ok
+    ? ""
+    : "skipped" in mailed
+      ? "The permit was saved, but the email to ehs@sma.ac.ae was not sent because the mail service is not configured."
+      : `The permit was saved, but the email to ehs@sma.ac.ae failed: ${mailed.error}`;
 
   await supabase.from("audit_log").insert({
     submission_id: submissionId,
     action: "submitted",
-    note: "Contractor submission received",
+    note: emailWarning || "Contractor submission received and emailed to ehs@sma.ac.ae",
     actor: payload.contactEmail,
   });
 
   revalidatePath("/admin");
-  return { ok: true as const, refNo: row.ref_no as string, id: submissionId };
+  return { ok: true as const, refNo: row.ref_no as string, id: submissionId, emailWarning };
 }
 
 export async function lookupPermitRef(refNo: string) {

@@ -17,10 +17,11 @@ export function SignaturePadField({ onChange, error }: Props) {
   return (
     <div>
       <Label>Signature *</Label>
-      <div className="mt-2 rounded-md border border-dashed border-slate-300 bg-white">
+      <div className="mt-2 overflow-hidden rounded-md border border-white/30 bg-[#13294B]">
         <SignatureCanvas
           ref={ref}
-          penColor="#13294B"
+          penColor="#ffffff"
+          backgroundColor="#13294B"
           canvasProps={{
             className: "w-full h-40 rounded-md",
           }}

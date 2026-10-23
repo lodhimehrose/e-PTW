@@ -78,6 +78,7 @@ export function WorkScopePanel({
   timeError,
   activityError,
   notice,
+  lockClassification = false,
 }: {
   scope: string;
   onScope: (value: string) => void;
@@ -99,6 +100,7 @@ export function WorkScopePanel({
   timeError?: string;
   activityError?: string;
   notice?: ReactNode;
+  lockClassification?: boolean;
 }) {
   const normal = activities.includes(NORMAL_ACTIVITY);
   const critical = activities.includes(CRITICAL_ACTIVITY);
@@ -119,9 +121,9 @@ export function WorkScopePanel({
       </section>
 
       <div className="space-y-4">
-        <section className="rounded-xl border border-slate-200 p-4" style={{ background: "#fff", color: "#13294B" }}>
+        <section className={`rounded-xl border border-slate-200 p-4 ${lockClassification ? "pointer-events-none opacity-70" : ""}`} style={{ background: "#fff", color: "#13294B" }}>
           <h2 className="text-base font-bold">For EHSQ</h2>
-          <p className="mb-3 text-xs text-slate-600">Tick normal activity, critical work, or both. These boxes stay visible on the official form.</p>
+          <p className="mb-3 text-xs text-slate-600">{lockClassification ? "The EHS officer marks normal activity and critical work after this form is submitted." : "Tick normal activity, critical work, or both. These boxes stay visible on the official form."}</p>
           <div className="space-y-2">
             <Choice checked={normal} tone="gold" label="Normal activity" hint="Light, routine, or minor work" onChange={() => onToggleActivity(NORMAL_ACTIVITY)} />
             {normal && <Checks items={LIGHT_WORK_OPTIONS} selected={lightWorks} onToggle={onToggleLight} />}

@@ -23,7 +23,9 @@
 
   body {
     background-color: #14081f;
-    background-image: linear-gradient(165deg, #2a0a4a 0%, #12081c 42%, #3a1468 100%);
+    background-image:
+      radial-gradient(circle at 50% 46%, rgba(255, 248, 232, 0.72) 0, rgba(255, 248, 232, 0.28) 180px, transparent 460px),
+      linear-gradient(165deg, #2a0a4a 0%, #12081c 42%, #3a1468 100%);
     background-attachment: fixed;
     color: hsl(var(--foreground));
     -webkit-font-smoothing: antialiased;
@@ -39,7 +41,8 @@
     height: min(78vw, 560px);
     transform: translate(-50%, -50%);
     background: url("/sma-logo.jpg") center / contain no-repeat;
-    opacity: 0.16;
+    opacity: 0.72;
+    filter: drop-shadow(0 0 18px rgba(255, 248, 232, 0.85));
     pointer-events: none;
   }
 

@@ -14,7 +14,7 @@ export default function PortalSignupPage() {
   const [company, setCompany] = useState("");
   const [licenseNo, setLicenseNo] = useState("");
   const [licenseExpiry, setLicenseExpiry] = useState("");
-  const [licenseFile, setLicenseFile] = useState<FilePayload | undefined>();
+  const [licenseFiles, setLicenseFiles] = useState<FilePayload[]>([]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -33,7 +33,7 @@ export default function PortalSignupPage() {
       tradeLicenseExpiry: licenseExpiry,
       email,
       password,
-      tradeLicense: licenseFile || { name: "", type: "", base64: "" },
+      tradeLicenses: licenseFiles,
       nextPath,
     });
     setLoading(false);
@@ -66,8 +66,9 @@ export default function PortalSignupPage() {
         </div>
         <FileUploadField
           label="Trade license"
-          files={licenseFile ? [licenseFile] : []}
-          onChange={(files) => setLicenseFile(files[0])}
+          files={licenseFiles}
+          onChange={setLicenseFiles}
+          multiple
           required
         />
         <div>

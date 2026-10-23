@@ -9,20 +9,6 @@ import { formDisplayName, sendEmail } from "@/lib/email/send";
 import { APPROVAL_CONTACTS } from "@/lib/constants";
 import QRCode from "qrcode";
 
-function uniqueAddresses(values: Array<string | null | undefined>) {
-  const seen = new Set<string>();
-  const emails: string[] = [];
-  for (const value of values) {
-    const email = value?.trim();
-    if (!email || !email.includes("@")) continue;
-    const key = email.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    emails.push(email);
-  }
-  return emails;
-}
-
 export type Decision = "approved" | "approved_with_conditions" | "rejected";
 
 export async function decideSubmission(
@@ -88,11 +74,11 @@ export async function decideSubmission(
   }
 
   let approvedPdfPath: string | null = null;
-
-  try {
+  let pdfBuf: Buffer | undefined;
   if (decision !== "rejected") {
+    try {
     const qrDataUrl = await QRCode.toDataURL(verifyUrl, { margin: 1, width: 160 });
-    const pdfBuf = await renderSubmissionPdf({
+    pdfBuf = await renderSubmissionPdf({
       refNo: sub.ref_no,
       type: sub.type,
       formTitle: formDisplayName(sub.type),
@@ -109,46 +95,31 @@ export async function decideSubmission(
     });
     approvedPdfPath = `${id}/approved.pdf`;
     await uploadBuffer(approvedPdfPath, pdfBuf, "application/pdf");
-
-    const configured =
-      sub.type === "gate_pass"
-        ? settings?.gate_pass_recipients
-        : sub.type === "ptw_emergency"
-          ? settings?.ptw_emergency_recipients
-          : settings?.ptw_standard_recipients;
-    const recipients = uniqueAddresses([
-      sub.contact_email,
-      ...APPROVAL_CONTACTS,
-      ...(configured ? String(configured).split(",") : []),
-    ]);
-
-    await sendEmail({
-      to: recipients,
+    await supabase.from("submissions").update({ approved_pdf_url: approvedPdfPath }).eq("id", id);
+    } catch (error) {
+      console.error("Approved PDF was not created", error);
+      pdfBuf = undefined;
+    }
+    const approvedMail = await sendEmail({
+      to: [...APPROVAL_CONTACTS],
       subject: `Approved – ${formDisplayName(sub.type)} ${sub.ref_no}`,
       html: `<p><strong>${sub.company_name}</strong> — ${formDisplayName(sub.type)} <strong>${sub.ref_no}</strong> is approved.</p>
         <p>Status: ${status.replace(/_/g, " ")}</p>
         ${note ? `<p>Conditions: ${note}</p>` : ""}
         <p>The matching gate pass is approved with this permit.</p>
         <p><a href="${verifyUrl}">Verify permit</a></p>`,
-      attachments: [{ filename: `${sub.ref_no}-approved.pdf`, content: pdfBuf }],
+      attachments: pdfBuf ? [{ filename: `${sub.ref_no}-approved.pdf`, content: pdfBuf }] : undefined,
     });
-    await supabase.from("submissions").update({ approved_pdf_url: approvedPdfPath }).eq("id", id);
-  } else {
-    const recipients = uniqueAddresses([
-      sub.contact_email,
-      ...APPROVAL_CONTACTS,
-      ...(settings?.ptw_standard_recipients ? String(settings.ptw_standard_recipients).split(",") : []),
-    ]);
-    await sendEmail({
-      to: recipients,
+    if (!approvedMail.ok) console.error("Approval email was not sent", approvedMail);
+  } else if (sub.contact_email) {
+    const rejectedMail = await sendEmail({
+      to: sub.contact_email,
       subject: `Not approved – ${sub.ref_no}`,
       html: `<p><strong>${sub.company_name}</strong> — ${formDisplayName(sub.type)} <strong>${sub.ref_no}</strong> was not approved.</p>
         <p><strong>Reason:</strong> ${note}</p>
         <p><a href="${site}">Submit again</a></p>`,
     });
-  }
-  } catch (error) {
-    console.error("Decision saved, but the email or PDF did not finish", error);
+    if (!rejectedMail.ok) console.error("Rejection email was not sent", rejectedMail);
   }
 
   revalidatePath("/admin");

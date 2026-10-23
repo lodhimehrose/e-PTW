@@ -9,22 +9,104 @@ export type AccountProfile = {
   tradeLicenseNo: string;
   tradeLicenseExpiry: string;
   email: string;
-  tradeLicenseName: string;
-  tradeLicensePath: string;
+  tradeLicenseNames: string[];
+  tradeLicensePaths: string[];
 };
+
+function textList(value: unknown, single: unknown) {
+  if (Array.isArray(value)) return value.map(String).filter(Boolean);
+  if (typeof single === "string" && single) return [single];
+  return [];
+}
 
 export async function loadAccountProfile(): Promise<AccountProfile | null> {
   const supabase = await createAuthServerClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-  const meta = (user.user_metadata ?? {}) as Record<string, string>;
+  const admin = createServiceClient();
+  let freshMeta: Record<string, unknown> = {};
+  try {
+    const { data: fresh } = await admin.auth.admin.getUserById(user.id);
+    freshMeta = (fresh.user?.user_metadata ?? {}) as Record<string, unknown>;
+  } catch {
+    freshMeta = {};
+  }
+  const meta = {
+    ...((user.user_metadata ?? {}) as Record<string, unknown>),
+    ...freshMeta,
+  };
+  let companyName = String(meta.company_name || "");
+  let tradeLicenseNo = String(meta.trade_license_no || meta.tradeLicenseNo || "");
+  let tradeLicenseExpiry = String(meta.trade_license_expiry || meta.tradeLicenseExpiry || "");
+  let tradeLicensePaths = textList(meta.trade_license_paths, meta.trade_license_path);
+  let tradeLicenseNames = textList(meta.trade_license_names, meta.trade_license_name);
+  if (!tradeLicensePaths.length) {
+    const listed = await admin.storage.from("submissions").list(`accounts/${user.id}`);
+    const files = (listed.data ?? []).filter((file) => file.name && !file.name.endsWith("/"));
+    tradeLicensePaths = files.map((file) => `accounts/${user.id}/${file.name}`);
+    tradeLicenseNames = files.map((file) => file.name);
+  }
+
+  if (!tradeLicenseNo || !tradeLicenseExpiry || !tradeLicensePaths.length) {
+    const columns = "id, data, company_name";
+    const lookups = [
+      admin.from("submissions").select(columns).eq("owner_id", user.id).order("created_at", { ascending: false }).limit(8),
+      admin.from("submissions").select(columns).eq("contact_email", user.email).order("created_at", { ascending: false }).limit(8),
+    ];
+    if (companyName) {
+      lookups.push(admin.from("submissions").select(columns).eq("company_name", companyName).order("created_at", { ascending: false }).limit(8));
+    }
+    const found = await Promise.all(lookups);
+    const seen = new Set<string>();
+    const rows = found.flatMap((result) => result.data ?? []).filter((row) => {
+      if (!row.id || seen.has(row.id)) return false;
+      seen.add(row.id);
+      return true;
+    });
+    let matchedId = "";
+    for (const row of rows) {
+      const saved = (row.data ?? {}) as Record<string, unknown>;
+      if (!companyName && row.company_name) companyName = String(row.company_name);
+      if (!tradeLicenseNo && saved.tradeLicenseNo) {
+        tradeLicenseNo = String(saved.tradeLicenseNo);
+        matchedId = String(row.id);
+      }
+      if (!tradeLicenseExpiry && saved.tradeLicenseExpiry) tradeLicenseExpiry = String(saved.tradeLicenseExpiry);
+    }
+    if (!tradeLicensePaths.length && rows.length) {
+      const { data: docs } = await admin
+        .from("documents")
+        .select("submission_id, file_url, file_name")
+        .in("submission_id", rows.map((row) => row.id));
+      const licenses = (docs ?? []).filter((doc) => /trade-license/i.test(String(doc.file_name || "")) || /trade-license/i.test(String(doc.file_url || "")));
+      const preferred = matchedId ? licenses.filter((doc) => doc.submission_id === matchedId) : licenses;
+      const chosen = (preferred.length ? preferred : licenses).slice(0, 8);
+      tradeLicensePaths = chosen.map((doc) => String(doc.file_url)).filter(Boolean);
+      tradeLicenseNames = chosen.map((doc) => String(doc.file_name || "Trade license"));
+    }
+    if (tradeLicenseNo && !meta.trade_license_no) {
+      await admin.auth.admin.updateUserById(user.id, {
+        user_metadata: {
+          ...meta,
+          company_name: companyName,
+          trade_license_no: tradeLicenseNo,
+          trade_license_expiry: tradeLicenseExpiry,
+          trade_license_path: tradeLicensePaths[0] || "",
+          trade_license_name: tradeLicenseNames[0] || "",
+          trade_license_paths: tradeLicensePaths,
+          trade_license_names: tradeLicenseNames,
+        },
+      });
+    }
+  }
+
   return {
-    companyName: meta.company_name || "",
-    tradeLicenseNo: meta.trade_license_no || "",
-    tradeLicenseExpiry: meta.trade_license_expiry || "",
+    companyName,
+    tradeLicenseNo,
+    tradeLicenseExpiry,
     email: user.email || "",
-    tradeLicenseName: meta.trade_license_name || "",
-    tradeLicensePath: meta.trade_license_path || "",
+    tradeLicenseNames,
+    tradeLicensePaths,
   };
 }
 
@@ -34,7 +116,7 @@ export async function registerContractor(input: {
   tradeLicenseExpiry: string;
   email: string;
   password: string;
-  tradeLicense: { name: string; type: string; base64: string };
+  tradeLicenses: { name: string; type: string; base64: string }[];
   nextPath?: string;
 }) {
   const email = input.email.trim().toLowerCase();
@@ -45,7 +127,8 @@ export async function registerContractor(input: {
   if (input.tradeLicenseExpiry < new Date().toISOString().slice(0, 10)) {
     return { ok: false as const, error: "That trade license is expired." };
   }
-  if (!input.tradeLicense?.base64) return { ok: false as const, error: "Upload the trade license." };
+  const licenses = (input.tradeLicenses ?? []).filter((file) => file.base64);
+  if (!licenses.length) return { ok: false as const, error: "Upload the trade license." };
   if (email === adminEmail) return { ok: false as const, error: "This email is reserved for the EHS officer." };
   if (input.password.length < 6) return { ok: false as const, error: "Use at least 6 characters for the password." };
 
@@ -70,18 +153,25 @@ export async function registerContractor(input: {
     return { ok: false as const, error: message };
   }
 
-  const ext = input.tradeLicense.name.includes(".")
-    ? input.tradeLicense.name.slice(input.tradeLicense.name.lastIndexOf(".")).toLowerCase()
-    : "";
-  const path = `accounts/${data.user.id}/trade-license${ext || ".pdf"}`;
-  await uploadBuffer(path, Buffer.from(input.tradeLicense.base64, "base64"), input.tradeLicense.type || "application/pdf");
+  const paths: string[] = [];
+  const names: string[] = [];
+  for (let index = 0; index < licenses.length; index += 1) {
+    const file = licenses[index];
+    const ext = file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")).toLowerCase() : ".pdf";
+    const path = `accounts/${data.user.id}/trade-license-${index + 1}${ext}`;
+    await uploadBuffer(path, Buffer.from(file.base64, "base64"), file.type || "application/pdf");
+    paths.push(path);
+    names.push(file.name);
+  }
   await admin.auth.admin.updateUserById(data.user.id, {
     user_metadata: {
       company_name: input.companyName.trim(),
       trade_license_no: input.tradeLicenseNo.trim(),
       trade_license_expiry: input.tradeLicenseExpiry,
-      trade_license_path: path,
-      trade_license_name: input.tradeLicense.name,
+      trade_license_path: paths[0],
+      trade_license_name: names[0],
+      trade_license_paths: paths,
+      trade_license_names: names,
     },
   });
 

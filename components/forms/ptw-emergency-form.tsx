@@ -23,8 +23,9 @@ type Draft = {
   companyName: string;
   tradeLicenseNo: string;
   tradeLicenseExpiry: string;
-  tradeLicenseFile?: FilePayload;
-  tradeLicenseOnFile: boolean;
+  tradeLicenseFiles: FilePayload[];
+  storedLicenseNames: string[];
+  storedLicensePaths: string[];
   contactEmail: string;
   building: string;
   workers: WorkerInput[];
@@ -43,7 +44,9 @@ const initial: Draft = {
   companyName: "",
   tradeLicenseNo: "",
   tradeLicenseExpiry: "",
-  tradeLicenseOnFile: false,
+  tradeLicenseFiles: [],
+  storedLicenseNames: [],
+  storedLicensePaths: [],
   contactEmail: "",
   building: "Building 1",
   workers: [{ fullName: "", trade: "Supervisor", emiratesId: "", eidExpiry: "", mobile: "", inductionDone: "yes" }],
@@ -87,7 +90,8 @@ export function PtwEmergencyForm() {
         tradeLicenseNo: profile.tradeLicenseNo || current.tradeLicenseNo,
         tradeLicenseExpiry: profile.tradeLicenseExpiry || current.tradeLicenseExpiry,
         contactEmail: profile.email || current.contactEmail,
-        tradeLicenseOnFile: Boolean(profile.tradeLicensePath),
+        storedLicenseNames: profile.tradeLicenseNames,
+        storedLicensePaths: profile.tradeLicensePaths,
       }));
     });
   }, []);
@@ -96,7 +100,8 @@ export function PtwEmergencyForm() {
   const fromTime = data.validFrom.slice(11, 16);
   const toDate = data.validUntil.slice(0, 10);
   const toTime = data.validUntil.slice(11, 16);
-  const companyOk = Boolean(data.companyName.trim() && data.tradeLicenseNo.trim() && data.tradeLicenseExpiry && (data.tradeLicenseFile || data.tradeLicenseOnFile) && data.contactEmail.includes("@"));
+  const licenseReady = data.tradeLicenseFiles.length > 0 || data.storedLicensePaths.length > 0;
+  const companyOk = Boolean(data.companyName.trim() && data.tradeLicenseNo.trim() && data.tradeLicenseExpiry && licenseReady && data.contactEmail.includes("@"));
   const risksOk = data.risks.length > 0 && (!data.risks.includes("Others") || data.riskOther.trim().length > 1);
   const supervisorOk = !workerFieldError(supervisor);
   const timeOk = Boolean(fromDate && fromTime && toDate && toTime);
@@ -110,7 +115,7 @@ export function PtwEmergencyForm() {
     if (!data.tradeLicenseNo.trim()) e.tradeLicenseNo = "Trade license number is required.";
     if (!data.tradeLicenseExpiry) e.tradeLicenseExpiry = "Trade license expiry is required.";
     else if (data.tradeLicenseExpiry < today) e.tradeLicenseExpiry = "Trade license is expired. Update it before this company can apply.";
-    if (!data.tradeLicenseFile && !data.tradeLicenseOnFile) e.tradeLicenseFile = "Upload the trade license.";
+    if (!data.tradeLicenseFiles.length && !data.storedLicensePaths.length) e.tradeLicenseFile = "Upload the trade license.";
     const workerMessage = workerFieldError({ ...supervisor, emiratesId: formatEmiratesId(supervisor.emiratesId) });
     if (workerMessage) e.worker = workerMessage;
     if (toDate && supervisor.eidExpiry && !validateEidAfterWorkEnd([supervisor], toDate)) {
@@ -138,7 +143,7 @@ export function PtwEmergencyForm() {
       maxWorkers: 1,
       signatureDataUrl: data.signatureDataUrl,
       documents: [
-        ...(data.tradeLicenseFile ? [{ ...data.tradeLicenseFile, name: `Trade-license-${data.tradeLicenseFile.name}` }] : []),
+        ...data.tradeLicenseFiles.map((file) => ({ ...file, name: `Trade-license-${file.name}` })),
         ...(supervisor.eidCopy ? [{ ...supervisor.eidCopy, name: `EID-${supervisor.fullName}-${supervisor.eidCopy.name}` }] : []),
       ],
       data: {
@@ -147,7 +152,7 @@ export function PtwEmergencyForm() {
         description: data.risks.includes("Others") ? data.riskOther : data.risks.join(", "),
         tradeLicenseNo: data.tradeLicenseNo,
         tradeLicenseExpiry: data.tradeLicenseExpiry,
-        useStoredTradeLicense: !data.tradeLicenseFile && data.tradeLicenseOnFile,
+        storedTradeLicensePaths: data.storedLicensePaths,
         declarantName: data.declarantName,
         declarantDesignation: data.declarantDesignation,
         validFrom: data.validFrom,
@@ -173,7 +178,7 @@ export function PtwEmergencyForm() {
       notify(res.error, "error");
       return;
     }
-    notify("Emergency permit submitted.");
+    notify(res.emailWarning || "Emergency permit submitted. EHS has been emailed.");
     router.push(`/submitted/${encodeURIComponent(res.refNo)}`);
   }
 
@@ -228,12 +233,16 @@ export function PtwEmergencyForm() {
           <Input className="mt-1" type="email" value={data.contactEmail} onChange={(event) => setData({ ...data, contactEmail: event.target.value })} />
         </Mark>
         <div className="sm:col-span-2">
-          <Mark ok={Boolean(data.tradeLicenseFile || data.tradeLicenseOnFile)}>
+          <Mark ok={licenseReady}>
+            {data.storedLicenseNames.length > 0 && (
+              <p className="mb-2 text-sm text-green-300">Already on the account: {data.storedLicenseNames.join(", ")}</p>
+            )}
             <FileUploadField
-              label={data.tradeLicenseOnFile ? "Trade license (already on the account)" : "Trade license"}
-              files={data.tradeLicenseFile ? [data.tradeLicenseFile] : []}
-              onChange={(files) => setData({ ...data, tradeLicenseFile: files[0], tradeLicenseOnFile: files[0] ? false : data.tradeLicenseOnFile })}
-              required={!data.tradeLicenseOnFile}
+              label="Trade license"
+              files={data.tradeLicenseFiles}
+              onChange={(files) => setData({ ...data, tradeLicenseFiles: files })}
+              multiple
+              required={!data.storedLicensePaths.length}
             />
           </Mark>
         </div>
