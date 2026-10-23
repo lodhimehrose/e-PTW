@@ -344,9 +344,41 @@ export async function issueGatePass(
   return { ok: true as const, id: row.id as string, refNo: row.ref_no as string };
 }
 
+export async function saveAdminSignatures(
+  id: string,
+  input: { fmName: string; fmSignature?: string; securityName: string; securitySignature?: string; ehsqName: string; ehsqSignature?: string },
+) {
+  const { user } = await requireAdmin();
+  const supabase = createServiceClient();
+  const { data: current } = await supabase.from("submissions").select("data").eq("id", id).single();
+  if (!current) return { ok: false as const, error: "Not found" };
+  await supabase.from("submissions").update({
+    data: {
+      ...((current.data as Record<string, unknown>) ?? {}),
+      fmName: input.fmName.trim(),
+      fmDesignation: "FM",
+      fmSignature: input.fmSignature || "",
+      securityName: input.securityName.trim(),
+      securityDesignation: "Security Supervisor",
+      securitySignature: input.securitySignature || "",
+      ehsqName: input.ehsqName.trim(),
+      ehsqDesignation: "EHSQ Officer",
+      ehsqSignature: input.ehsqSignature || "",
+    },
+  }).eq("id", id);
+  await supabase.from("audit_log").insert({
+    submission_id: id,
+    action: "admin_signatures",
+    note: "FM, Security Supervisor and EHSQ Officer signatures saved",
+    actor: user.email,
+  });
+  revalidatePath(`/admin/submissions/${id}`);
+  return { ok: true as const };
+}
+
 export async function saveWorkClassification(
   id: string,
-  input: { workType: string[]; lightWorks: string[]; criticalWorks: string[]; safetyControls?: string[] },
+  input: { workType: string[]; lightWorks: string[]; criticalWorks: string[]; safetyControls?: string[]; safetyOther?: string; criticalOther?: string },
 ) {
   const { user } = await requireAdmin();
   const supabase = createServiceClient();
@@ -361,6 +393,8 @@ export async function saveWorkClassification(
         lightWorks: input.lightWorks,
         criticalWorks: input.criticalWorks,
         safetyControls: input.safetyControls ?? [],
+        safetyOther: input.safetyOther || "",
+        criticalOther: input.criticalOther || "",
       },
       updated_at: new Date().toISOString(),
     })

@@ -7,6 +7,7 @@ import { getSignedUrl } from "@/lib/storage";
 import { EhsqClassification } from "@/components/admin/ehsq-classification";
 import { GatePassEditor } from "@/components/admin/gate-pass-editor";
 import { OfficialFormView } from "@/components/admin/official-form-view";
+import { AdminSignOff } from "@/components/admin/admin-sign-off";
 
 function labelize(key: string) {
   return key
@@ -96,7 +97,33 @@ export default async function SubmissionDetailPage({
   const tab = searchParams.tab || "permit";
   const gate = linkedGate;
   const shown = tab === "gate" && gate ? gate : sub;
-  const shownData = (shown.data ?? {}) as Record<string, unknown>;
+  const rawGateData = (gate?.data ?? {}) as Record<string, unknown>;
+  const leadWorker = (sub.workers ?? [])[0] as { full_name?: string; mobile?: string } | undefined;
+  const clock = (value: unknown) => {
+    const text = String(value || "");
+    if (text.includes("T")) return text.slice(11, 16);
+    return text.length === 5 ? text : "";
+  };
+  const shownData = gate
+    ? {
+        ...rawGateData,
+        tradeLicenseNo: rawGateData.tradeLicenseNo || data.tradeLicenseNo,
+        tradeLicenseExpiry: rawGateData.tradeLicenseExpiry || data.tradeLicenseExpiry,
+        permitType: rawGateData.permitType || (sub.type === "ptw_emergency" ? "Emergency" : "Standard"),
+        sourcePermit: rawGateData.sourcePermit || sub.ref_no,
+        supervisorName: rawGateData.supervisorName || data.supervisorName || leadWorker?.full_name || "",
+        supervisorPhone: rawGateData.supervisorPhone || data.supervisorPhone || leadWorker?.mobile || "",
+        department: rawGateData.department || data.department,
+        purpose: rawGateData.purpose || data.workDescription || data.description || data.riskOther || "",
+        entryFrom: rawGateData.entryFrom || String(gate.start_at || sub.start_at || "").slice(0, 10),
+        entryTo: rawGateData.entryTo || String(gate.end_at || sub.end_at || "").slice(0, 10),
+        hoursFrom: rawGateData.hoursFrom || data.timeFrom || clock(sub.start_at),
+        hoursTo: rawGateData.hoursTo || data.timeTo || clock(sub.end_at),
+        workerCount: (gate.workers ?? []).length,
+        maxWorkers: gate.max_workers ?? data.maxWorkers ?? (gate.workers ?? []).length,
+        declarantName: rawGateData.declarantName || data.declarantName,
+      }
+    : ((shown.data ?? {}) as Record<string, unknown>);
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -162,7 +189,7 @@ export default async function SubmissionDetailPage({
             endAt={gate.end_at}
             data={shownData}
             workers={gate.workers ?? []}
-            vehicles={gate.vehicles ?? []}
+            vehicles={(gate.vehicles ?? []).length ? gate.vehicles : (sub.vehicles ?? [])}
             tools={gate.tools ?? []}
             gateLogs={gate.gate_logs ?? []}
             documents={documents}
@@ -218,9 +245,12 @@ export default async function SubmissionDetailPage({
           lightWorks={data.lightWorks}
           criticalWorks={data.criticalWorks}
           safetyControls={data.safetyControls}
-          showSafety={sub.type === "ptw_emergency"}
+          safetyOther={data.safetyOther}
+          criticalOther={data.criticalOther}
+          showSafety
         />
       )}
+      {sub.type !== "gate_pass" && <AdminSignOff id={sub.id} data={data} />}
 
       <SubmissionActions id={sub.id} type={sub.type} />
 

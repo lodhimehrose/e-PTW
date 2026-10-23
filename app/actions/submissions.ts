@@ -314,20 +314,25 @@ export async function submitForm(payload: SubmitPayload) {
     const endDay = (payload.endAt || "").slice(0, 10);
     const eligible = (workers ?? []).filter((worker) => !endDay || String(worker.eid_expiry).slice(0, 10) >= endDay);
     if (gateNo) {
+      const firstWorker = eligible[0];
+      const fromClock = String(storedData.timeFrom || payload.startAt || "").slice(11, 16);
+      const toClock = String(storedData.timeTo || payload.endAt || "").slice(11, 16);
       const gateData = {
         autoCreated: true,
         sourcePermit: refNo,
         form: payload.type === "ptw_emergency" ? "Form-08A" : "Form-08",
         permitType: payload.type === "ptw_emergency" ? "Emergency" : "Standard",
-        purpose: String(storedData.workDescription || storedData.workScope || storedData.description || ""),
+        purpose: String(storedData.workDescription || storedData.description || storedData.riskOther || ""),
         tradeLicenseNo: storedData.tradeLicenseNo,
         tradeLicenseExpiry: storedData.tradeLicenseExpiry,
-        supervisorName: storedData.supervisorName || storedData.reportedBy,
-        supervisorPhone: storedData.supervisorPhone,
+        supervisorName: storedData.supervisorName || firstWorker?.full_name || "",
+        supervisorPhone: storedData.supervisorPhone || firstWorker?.mobile || "",
         department: storedData.department,
         declarantName: storedData.declarantName,
-        entryFrom: payload.startAt,
-        entryTo: payload.endAt,
+        entryFrom: String(payload.startAt || "").slice(0, 10),
+        entryTo: String(payload.endAt || "").slice(0, 10),
+        hoursFrom: fromClock,
+        hoursTo: toClock,
         workerCount: eligible.length,
         maxWorkers: payload.maxWorkers ?? eligible.length,
       };
@@ -350,6 +355,19 @@ export async function submitForm(payload: SubmitPayload) {
         gate = await supabase.from("submissions").insert({ ...base, status: "pending" }).select("id").single();
       }
       if (gate.data?.id) {
+        if (payload.vehicles?.length) {
+          await supabase.from("vehicles").insert(
+            payload.vehicles.map((vehicle) => ({
+              submission_id: gate.data.id,
+              vehicle_type: vehicle.vehicleType as string,
+              plate_no: vehicle.plateNo as string,
+              emirate: vehicle.emirate as string,
+              driver_name: vehicle.driverName as string,
+              license_no: vehicle.licenseNo as string,
+              license_expiry: vehicle.licenseExpiry as string,
+            })),
+          );
+        }
         if (eligible.length) {
           await supabase.from("workers").insert(
             eligible.map((worker) => ({

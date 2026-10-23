@@ -71,8 +71,11 @@ export function statementsFrom(value: unknown, texts: { key: string; text: strin
     return value as StatementRecord[];
   }
   if (Array.isArray(value) && value.every((item) => typeof item === "string")) {
-    const accepted = new Set(value);
-    return texts.map((item) => ({ ...item, accepted: accepted.has(item.text) }));
+    const accepted = value.map((item) => item.trim().toLowerCase());
+    return texts.map((item) => ({
+      ...item,
+      accepted: accepted.some((saved) => saved === item.text.trim().toLowerCase() || saved.slice(0, 48) === item.text.trim().toLowerCase().slice(0, 48)),
+    }));
   }
   if (Array.isArray(value) && value.every((item) => typeof item === "boolean")) {
     return texts.map((item, index) => ({ ...item, accepted: Boolean(value[index]) }));

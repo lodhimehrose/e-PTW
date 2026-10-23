@@ -22,6 +22,7 @@ import { SECTION_IV_UNDERTAKINGS } from "@/lib/constants";
 import { CRITICAL_ACTIVITY, NORMAL_ACTIVITY, toggleItem, WorkScopePanel } from "@/components/forms/work-scope-panel";
 import { addWorkingDays, dubaiToday } from "@/lib/working-days";
 import { notify } from "@/components/notice-bar";
+import { OptionalVehicles, type VehicleDraft } from "@/components/forms/optional-vehicles";
 import { HSE_SECTIONS } from "@/lib/hse-requirements";
 
 const PPE = [
@@ -66,6 +67,7 @@ type Draft = {
   applicantPhone: string;
   supervisorName: string;
   supervisorPhone: string;
+  vehicles: VehicleDraft[];
   honeypot: string;
 };
 
@@ -99,6 +101,7 @@ const initial: Draft = {
   applicantPhone: "",
   supervisorName: "",
   supervisorPhone: "",
+  vehicles: [],
   honeypot: "",
 };
 
@@ -228,6 +231,7 @@ export function PtwStandardForm() {
         undertakings: SECTION_IV_UNDERTAKINGS.filter((_, index) => data.undertakings[index]),
         submittedAt: new Date().toISOString(),
       },
+      vehicles: data.vehicles.filter((vehicle) => vehicle.plateNo.trim() || vehicle.vehicleType.trim() || vehicle.driverName.trim()),
       workers: attending.map((worker) => ({
         fullName: worker.fullName,
         trade: worker.trade,
@@ -450,6 +454,7 @@ export function PtwStandardForm() {
         ))}
       </section>
 
+      <OptionalVehicles vehicles={data.vehicles} onChange={(vehicles) => setData({ ...data, vehicles })} />
       <input className="hidden" tabIndex={-1} autoComplete="off" value={data.honeypot} onChange={(event) => setData({ ...data, honeypot: event.target.value })} />
       <FieldError message={errors.submit} />
       <Button type="submit" className="w-full" disabled={submitting}>{submitting ? "Submitting…" : "Submit"}</Button>

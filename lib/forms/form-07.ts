@@ -18,13 +18,14 @@ export const CRITICAL_WORK_OPTIONS = [
   "Crane / Hoist operation",
   "Fit-out / modification work",
   "Work on/near unprotected energized system / LV & HV room",
+  "Others",
 ];
 
 export const FORM_07_UNDERTAKINGS = [
   { key: "u1", text: "I confirm that all required safety precautions are in place, and I am fully responsible for their implementation." },
-  { key: "u2", text: "I confirm that the number of workers on site will not exceed the maximum approved in Section II-F, and that all workers listed in Section III hold a valid Emirates ID." },
+  { key: "u2", text: "I confirm that the number of workers on site will not exceed the maximum approved, and that all workers listed hold a valid Emirates ID." },
   { key: "u3", text: "I confirm that all information provided has been reviewed prior to submission to SMA management, and that it is true and accurate." },
-  { key: "u4", text: "I confirm that I have read and understood Section VI of this work permit application." },
+  { key: "u4", text: "I confirm that I have read and understood the health, safety and environment requirements of this permit." },
 ];
 
 export const form07: FormDefinition = {
@@ -86,20 +87,21 @@ export const form07: FormDefinition = {
     },
     {
       id: "sign",
-      code: "SECTION IV",
+      code: "SECTION V",
       title: "SIGNATURE",
       fields: [
         { key: "declarantName", label: "Name", type: "text", span: 8 },
         { key: "declarantDesignation", label: "Designation", type: "text", span: 8 },
         { key: "signature", label: "Signature", type: "signature", span: 8 },
-      ],
-    },
-    {
-      id: "approval",
-      code: "SECTION V",
-      title: "FOR SMA APPROVAL",
-      fields: [
-        { key: "approval", label: "Health & Safety / FM Engineer / Security & Protocol", type: "text", span: 24 },
+        { key: "fmName", label: "FM — Name", type: "text", span: 8 },
+        { key: "fmDesignation", label: "Designation", type: "text", span: 8 },
+        { key: "fmSignature", label: "FM signature", type: "signature", span: 8 },
+        { key: "securityName", label: "Security Supervisor — Name", type: "text", span: 8 },
+        { key: "securityDesignation", label: "Designation", type: "text", span: 8 },
+        { key: "securitySignature", label: "Security signature", type: "signature", span: 8 },
+        { key: "ehsqName", label: "EHSQ Officer — Name", type: "text", span: 8 },
+        { key: "ehsqDesignation", label: "Designation", type: "text", span: 8 },
+        { key: "ehsqSignature", label: "EHSQ signature", type: "signature", span: 8 },
       ],
     },
   ],

@@ -1,5 +1,6 @@
 import { optionList, type FormDefinition } from "./shared";
 import { CRITICAL_WORK_OPTIONS, form07, LIGHT_WORK_OPTIONS } from "./form-07";
+import { SAFETY_CONTROLS } from "@/lib/safety-controls";
 
 export const form07a: FormDefinition = {
   id: "form-07a",
@@ -47,7 +48,7 @@ export const form07a: FormDefinition = {
       code: "SECTION III",
       title: "IMMEDIATE SAFETY CONTROLS",
       fields: [
-        { key: "safetyControls", label: "Confirmed before work starts", type: "checkboxGroup", span: 24, options: optionList(["Area barricaded and warning signs placed", "Fire extinguisher available at the work point", "Occupants moved away from the affected area", "Fire watch arranged if fire systems are impaired", "Energy sources isolated, locked and tagged (LOTO)", "Workers briefed on hazards (toolbox talk)", "Correct PPE worn by all workers", "SMA Security informed of workers and access route"]) },
+        { key: "safetyControls", label: "Confirmed before work starts", type: "checkboxGroup", span: 24, options: optionList(SAFETY_CONTROLS) },
       ],
     },
     {
@@ -58,13 +59,9 @@ export const form07a: FormDefinition = {
     },
     {
       id: "sign",
-      code: "SECTION IV",
+      code: "SECTION V",
       title: "SIGNATURE",
-      fields: [
-        { key: "declarantName", label: "Name", type: "text", span: 8 },
-        { key: "declarantDesignation", label: "Designation", type: "text", span: 8 },
-        { key: "signature", label: "Signature", type: "signature", span: 8 },
-      ],
+      fields: form07.sections.find((section) => section.id === "sign")?.fields ?? [],
     },
   ],
   hse: form07.hse,

@@ -18,6 +18,7 @@ import { SECTION_IV_UNDERTAKINGS } from "@/lib/constants";
 import { EMERGENCY_RISKS, SAFETY_CONTROLS } from "@/lib/safety-controls";
 import { notify } from "@/components/notice-bar";
 import { PeopleOnFile } from "@/components/people-on-file";
+import { OptionalVehicles, type VehicleDraft } from "@/components/forms/optional-vehicles";
 
 type Draft = {
   risks: string[];
@@ -37,6 +38,7 @@ type Draft = {
   declarantName: string;
   declarantDesignation: string;
   signatureDataUrl?: string;
+  vehicles: VehicleDraft[];
   honeypot: string;
 };
 
@@ -57,6 +59,7 @@ const initial: Draft = {
   undertakings: [false, false, false, false],
   declarantName: "",
   declarantDesignation: "",
+  vehicles: [],
   honeypot: "",
 };
 
@@ -168,6 +171,7 @@ export function PtwEmergencyForm() {
         urgent: true,
         submittedAt: new Date().toISOString(),
       },
+      vehicles: data.vehicles.filter((vehicle) => vehicle.plateNo.trim() || vehicle.vehicleType.trim() || vehicle.driverName.trim()),
       workers: [{
         fullName: supervisor.fullName,
         trade: supervisor.trade || "Supervisor",
@@ -375,6 +379,7 @@ export function PtwEmergencyForm() {
         <p className="text-xs text-muted-foreground">Approval, conditions, and the gate pass signature are completed by EHS after this form is submitted.</p>
       </section>
 
+      <OptionalVehicles vehicles={data.vehicles} onChange={(vehicles) => setData({ ...data, vehicles })} />
       <input className="hidden" tabIndex={-1} autoComplete="off" value={data.honeypot} onChange={(event) => setData({ ...data, honeypot: event.target.value })} />
       <FieldError message={errors.submit} />
       <Button type="submit" className="w-full" disabled={submitting}>{submitting ? "Submitting…" : "Submit"}</Button>

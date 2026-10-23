@@ -7,6 +7,7 @@ export const SAFETY_CONTROLS = [
   "Fire watch arranged if fire systems are impaired",
   "Workers briefed on hazards (toolbox talk)",
   "SMA Security informed of workers and access route",
+  "Others",
 ];
 
 export const EMERGENCY_RISKS = [

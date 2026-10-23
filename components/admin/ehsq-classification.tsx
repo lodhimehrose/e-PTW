@@ -9,6 +9,7 @@ import { SAFETY_CONTROLS } from "@/lib/safety-controls";
 import { notify } from "@/components/notice-bar";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 
 function asList(value: unknown) {
   if (Array.isArray(value)) return value.map(String);
@@ -22,6 +23,8 @@ export function EhsqClassification({
   lightWorks,
   criticalWorks,
   safetyControls,
+  safetyOther,
+  criticalOther,
   showSafety,
 }: {
   id: string;
@@ -29,6 +32,8 @@ export function EhsqClassification({
   lightWorks: unknown;
   criticalWorks: unknown;
   safetyControls?: unknown;
+  safetyOther?: unknown;
+  criticalOther?: unknown;
   showSafety?: boolean;
 }) {
   const router = useRouter();
@@ -36,6 +41,8 @@ export function EhsqClassification({
   const [light, setLight] = useState(asList(lightWorks));
   const [critical, setCritical] = useState(asList(criticalWorks));
   const [safety, setSafety] = useState(asList(safetyControls));
+  const [safetyNote, setSafetyNote] = useState(String(safetyOther || ""));
+  const [criticalNote, setCriticalNote] = useState(String(criticalOther || ""));
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -46,6 +53,8 @@ export function EhsqClassification({
       lightWorks: activities.includes(NORMAL_ACTIVITY) ? light : [],
       criticalWorks: activities.includes(CRITICAL_ACTIVITY) ? critical : [],
       safetyControls: safety,
+      safetyOther: safety.includes("Others") ? safetyNote : "",
+      criticalOther: critical.includes("Others") ? criticalNote : "",
     });
     setSaving(false);
     setMessage(result.ok ? "Classification saved on the permit." : result.error);
@@ -87,6 +96,7 @@ export function EhsqClassification({
                   {item}
                 </label>
               ))}
+              {critical.includes("Others") && <Input value={criticalNote} onChange={(event) => setCriticalNote(event.target.value)} placeholder="Describe the other critical work" />}
             </div>
           )}
         </div>
@@ -102,6 +112,7 @@ export function EhsqClassification({
                 {item}
               </label>
             ))}
+            {safety.includes("Others") && <Input value={safetyNote} onChange={(event) => setSafetyNote(event.target.value)} placeholder="Describe the other safety requirement" />}
           </div>
         </div>
       )}

@@ -163,7 +163,7 @@ export function OfficialFormView({
                 }
                 if (field.type === "statement") {
                   const match = statements.find((item) => item.text === field.label);
-                  const accepted = match ? match.accepted : Boolean(values.declarantName);
+                  const accepted = match ? match.accepted : false;
                   return (
                     <p key={field.key} className="border border-[#808080] px-2 py-1 text-[11px] leading-5 text-slate-900" style={{ gridColumn: "1 / -1" }}>
                       <Box on={accepted} /> {field.label}
@@ -171,12 +171,14 @@ export function OfficialFormView({
                   );
                 }
                 if (field.type === "signature") {
+                  const drawn = field.key === "signature" ? signatureUrl : text(values[field.key]);
+                  const caption = field.key === "signature" ? text(values.declarantName) : text(values[field.key.replace("Signature", "Name")]);
                   return (
-                    <div key={field.key} className="col-span-8 border border-[#808080] p-2">
-                      <p className="text-[11px] font-bold text-slate-700">Signature</p>
-                      {signatureUrl ? <img src={signatureUrl} alt="Signature" className="mt-1 h-14 object-contain" /> : <p className="text-[11px] text-slate-700">—</p>}
-                      <p className="text-[11px] text-slate-900">{text(values.declarantName)}</p>
-                      <p className="text-[11px] text-slate-700">{text(values.submittedAt || values.signedDate)}</p>
+                    <div key={field.key} className="border border-[#808080] p-2" style={{ gridColumn: "span 8 / span 8" }}>
+                      <p className="text-[11px] font-bold text-slate-700">{field.label}</p>
+                      {drawn ? <img src={drawn} alt={field.label} className="mt-1 h-14 bg-[#13294B] object-contain" /> : <p className="text-[11px] text-slate-700">—</p>}
+                      <p className="text-[11px] text-slate-900">{caption}</p>
+                      {field.key === "signature" && <p className="text-[11px] text-slate-700">{text(values.submittedAt || values.signedDate)}</p>}
                     </div>
                   );
                 }
@@ -189,10 +191,12 @@ export function OfficialFormView({
                   );
                 }
                 const span = field.span ?? 12;
+                const defaults: Record<string, string> = { fmDesignation: "FM", securityDesignation: "Security Supervisor", ehsqDesignation: "EHSQ Officer" };
+                const shownValue = text(fieldValue(field)) || defaults[field.key] || "";
                 return (
                   <div key={field.key} className="border border-[#808080] p-2" style={{ gridColumn: `span ${span} / span ${span}` }}>
                     <p className="text-[10px] font-bold uppercase text-slate-700">{field.label}</p>
-                    <p className="whitespace-pre-wrap text-[12px] text-slate-900">{text(fieldValue(field)) || "—"}</p>
+                    <p className="whitespace-pre-wrap text-[12px] text-slate-900">{shownValue || "—"}</p>
                   </div>
                 );
               })}
@@ -201,23 +205,21 @@ export function OfficialFormView({
         ))}
 
         {form.hse.length > 0 && (
-          <section className="hse-admin-page">
+          <section className="hse-instructions">
             <div className="grid grid-cols-[120px_1fr] bg-[#13294B] text-white">
               <p className="px-2 py-1 text-[11px] font-bold">SECTION VI</p>
-              <p className="px-2 py-1 text-[11px] font-bold">HEALTH, SAFETY AND ENVIRONMENT REQUIREMENTS</p>
+              <p className="px-2 py-1 text-[11px] font-bold">HEALTH, SAFETY AND ENVIRONMENT REQUIREMENTS (including but not limited to the following)</p>
             </div>
-            <p className="border border-[#808080] bg-[#FFF8E8] px-2 py-1 text-[11px] text-[#13294B]">For the EHS officer. This page is not included when the permit is printed.</p>
+            <div className="grid gap-2 md:grid-cols-2">
             {form.hse.map((block) => (
               <div key={block.id} className="border border-[#808080] p-2">
                 <p className="bg-[#DCE6F3] px-2 py-1 text-[11px] font-bold text-[#13294B]">{block.id}) {block.title}</p>
-                <ul className="mt-1 space-y-0.5 text-[11px] text-slate-900">
-                  {block.items.map((item) => {
-                    const picked = selectedKeys(data.hseAccepted ?? data.safetyControls, block.items.map((entry) => ({ key: entry, label: entry })));
-                    return <li key={item}><Box on={picked.includes(item)} /> {item}</li>;
-                  })}
+                <ul className="mt-1 space-y-0.5 text-[11px] leading-4 text-slate-900">
+                  {block.items.map((item) => <li key={item}>{item}</li>)}
                 </ul>
               </div>
             ))}
+            </div>
             <div className="flex flex-wrap gap-2 border border-[#808080] p-2 text-[11px] font-bold">
               <span className="bg-green-600 px-2 py-1 text-white">GREEN TAG – Safe for use</span>
               <span className="bg-yellow-300 px-2 py-1 text-slate-900">YELLOW TAG – Use with caution</span>

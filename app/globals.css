@@ -166,14 +166,17 @@
   }
 }
 
-.hse-admin-page {
+.hse-instructions {
   break-before: page;
   margin-top: 2rem;
 }
 
 @media print {
-  .hse-admin-page,
   body::before {
     display: none !important;
+  }
+
+  .hse-instructions {
+    break-before: page;
   }
 }

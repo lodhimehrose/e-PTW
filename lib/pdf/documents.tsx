@@ -134,10 +134,12 @@ export function SubmissionPdf({ sub }: { sub: PdfSubmission }) {
                 );
               }
               if (field.type === "signature") {
+                const image = field.key === "signature" ? sub.signatureDataUrl : typeof values[field.key] === "string" ? String(values[field.key]) : "";
+                const who = field.key === "signature" ? values.declarantName : values[field.key.replace("Signature", "Name")];
                 return (
                   <View key={field.key} style={styles.cell}>
-                    <Text style={styles.label}>Signature - {show(values.declarantName)}</Text>
-                    {sub.signatureDataUrl ? <Image src={sub.signatureDataUrl} style={{ width: 120, height: 36 }} /> : <Text>-</Text>}
+                    <Text style={styles.label}>{show(field.label)} - {show(who)}</Text>
+                    {image ? <Image src={image} style={{ width: 120, height: 36 }} /> : <Text>-</Text>}
                   </View>
                 );
               }
@@ -161,6 +163,24 @@ export function SubmissionPdf({ sub }: { sub: PdfSubmission }) {
         )}
         <Text style={styles.footer} fixed>SMA e-Permit Portal. Uncontrolled if printed.</Text>
       </Page>
+      {form.hse.length > 0 && (
+        <Page size="A4" style={styles.page}>
+          <View style={styles.section}>
+            <Text style={styles.sectionCode}>SECTION VI</Text>
+            <Text style={styles.sectionTitle}>HEALTH, SAFETY AND ENVIRONMENT REQUIREMENTS</Text>
+          </View>
+          <Text style={{ marginTop: 4, marginBottom: 4 }}>Instructions for the contractor and for SMA. These requirements apply to the work and are not a checklist.</Text>
+          {form.hse.map((block) => (
+            <View key={block.id} style={{ marginTop: 4 }}>
+              <Text style={{ backgroundColor: "#DCE6F3", fontFamily: "Helvetica-Bold", color: navy, padding: 2 }}>{show(block.id)}) {show(block.title)}</Text>
+              {block.items.map((item) => (
+                <Text key={item} style={{ marginTop: 1 }}>{show(item)}</Text>
+              ))}
+            </View>
+          ))}
+          <Text style={styles.footer} fixed>SMA e-Permit Portal. Uncontrolled if printed.</Text>
+        </Page>
+      )}
     </Document>
   );
 }
